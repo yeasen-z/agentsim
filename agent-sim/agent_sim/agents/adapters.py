@@ -5,7 +5,7 @@ Connects LLM models to the agent framework.
 from typing import Any, Dict, List, Optional, Tuple
 import json
 
-from tinyact.multi_agent import SingleAgent, AgentRole
+from agent_sim.multi_agent import SingleAgent, AgentRole
 
 
 class LLMClient:

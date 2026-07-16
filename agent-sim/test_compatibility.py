@@ -2,7 +2,7 @@
 Test script demonstrating single-agent and multi-agent compatibility.
 """
 
-from tinyact import (
+from agent_sim import (
     OperationEmulator,
     HiddenState,
     ToolExecutor,
@@ -67,7 +67,7 @@ def create_test_tools():
                 return {"success": True, "item_id": item_id}
         
         # Create new item
-        from tinyact.core import EntityState
+        from agent_sim.core import EntityState
         class Item(EntityState):
             def __init__(self, id, value):
                 self.id = id
@@ -240,7 +240,7 @@ def test_agent_roles():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("TinyAct Emulator - Single & Multi-Agent Compatibility Test")
+    print("Agent-Sim - Single & Multi-Agent Compatibility Test")
     print("=" * 60)
     
     test_agent_roles()
