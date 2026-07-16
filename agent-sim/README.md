@@ -131,20 +131,71 @@ Agent-Sim 采用插件化设计，可以轻松扩展各种交互场景：
 ### 安装
 
 ```bash
-git clone https://github.com/your-org/agent_sim-emulator.git
-cd agent_sim-emulator
+git clone https://github.com/your-org/agent-sim.git
+cd agent-sim
 pip install -e .
 ```
 
 ### 基础使用示例
 
-#### 1. 单一 Agent 模式
+#### 1. 发现环境能力 (Agent Discovers Environment)
+
+Agent Sim 的核心特性是**可插拔的场景注册系统**。Agent 可以通过标准接口发现环境的工具和能力：
+
+```python
+from agent_sim import registry, create_environment_adapter, OperationEmulator
+
+# 方式 1: 程序化注册场景
+registry.register(
+    scenario_id="email_mgmt",
+    name="Email Management",
+    module_path="my_scenarios.email",
+    state_initializer=init_email_state,
+    tool_registrar=register_email_tools,
+    verifier_factory=create_verifier
+)
+
+# 方式 2: 装饰器注册
+from agent_sim import register_scenario
+
+@register_scenario("calendar_mgmt", tags=["productivity"])
+def calendar_scenario():
+    return init_state, register_tools, create_verifier
+
+# 方式 3: 从目录自动发现
+registry.discover_from_directory("./scenarios", package_prefix="my_package")
+
+# 获取已注册的场景
+print("Available scenarios:", registry.list_scenarios())
+
+# 创建环境和适配器
+plugin = registry.get("email_mgmt")
+emulator = OperationEmulator(
+    scenario=scenario_def,
+    state_initializer=plugin.state_initializer,
+    tool_executor=plugin.tool_registrar(ToolExecutor()),
+    verifier=plugin.verifier_factory()
+)
+
+# Agent 通过适配器发现环境能力
+env_adapter = create_environment_adapter(emulator)
+env_info = env_adapter.get_environment_info()
+
+print(f"Environment: {env_info.scenario_name}")
+print(f"Tools: {[t.name for t in env_info.tools]}")
+print(f"Constraints: {env_info.constraints}")
+
+# 生成 Agent Prompt
+prompt = env_info.to_prompt()
+```
+
+#### 2. 单一 Agent 模式
 
 ```python
 from agent_sim import OperationEmulator, create_agent, LLMAdapter
 
 # 初始化仿真器
-emulator = OperationEmulator()
+emulator = OperationEmulator(...)
 emulator.reset(scenario_id="file_ops", task_id="archive_invoice_001", seed=42)
 
 # 创建 Agent
@@ -176,7 +227,7 @@ trace = emulator.get_trace()
 print(f"Task Success: {verification['success']}")
 ```
 
-#### 2. 多 Agent 协作模式
+#### 3. 多 Agent 协作模式
 
 ```python
 from agent_sim import create_agent, create_orchestrator
@@ -201,73 +252,17 @@ result = orchestrator.run_collaboration(
 print(f"Collaboration Result: {result}")
 ```
 
-#### 3. 使用 Harness 增强
-
-```python
-from agent_sim.harness import HarnessAgent, StateCompiler, CandidateActionGenerator
-
-# 创建 Harness 层
-compiler = StateCompiler(max_emails=5, max_files=10)
-action_gen = CandidateActionGenerator(top_k=3)
-
-harness_agent = HarnessAgent(
-    base_agent=llm_agent,
-    state_compiler=compiler,
-    action_generator=action_gen,
-    safety_gate=True
-)
-
-# Harness 会自动压缩状态、生成候选动作、过滤风险操作
-action = harness_agent.act(instruction, observation, tools)
-```
-
----
-
-## 📊 实验矩阵
-
-Agent-Sim 支持系统化的实验设计，回答关键研究问题：
-
-### 模型维度
-
-| 模型类型 | 示例 | 用途 |
-| :--- | :--- | :--- |
-| **Small (1-3B)** | Qwen2.5-1.5B, Phi-3-mini | 端侧部署、低延迟场景 |
-| **Medium (4-8B)** | Qwen2.5-7B, Llama-3-8B | 平衡性能与成本 |
-| **Large (API)** | GPT-4, Claude-3.5 | 天花板参考、复杂任务 |
-
-### Harness 层级
-
-| 层级 | 功能 | 预期提升 |
-| :--- | :--- | :--- |
-| **H0 Raw** | 原始工具接口 | Baseline |
-| **H1 Structured Obs** | 状态压缩与摘要 | +5~15% |
-| **H2 Candidate Actions** | 生成候选动作集 | +10~25% |
-| **H3 Verifier Feedback** | 实时验证反馈 | +5~10% |
-| **H4 Safety Gate** | 风险操作拦截 | 降低 Unsafe Rate |
-| **H5 Skill Reuse** | 历史成功轨迹复用 | +10~20% |
-
-### 评估指标
-
-- ✅ **Task Success Rate**: 任务完成率
-- ⚠️ **Invalid Tool Call Rate**: 无效工具调用率
-- 🎯 **Wrong Argument Rate**: 参数错误率
-- 🛑 **Premature Finish Rate**: 过早结束率
-- 🔒 **Unsafe Action Rate**: 不安全操作率
-- 📏 **Average Steps**: 平均步数
-- 🔄 **Recovery Success**: 错误恢复成功率
-- 📈 **Harness Gain**: Harness 带来的提升幅度
-
 ---
 
 ## 📁 项目结构
 
 ```text
-agent_sim-emulator/
+agent-sim/
 ├── README.md                  # 项目文档
 ├── setup.py                   # 安装配置
 ├── requirements.txt           # 依赖列表
 │
-├── agent_sim/                   # 核心包
+├── agent_sim/                 # 核心包
 │   ├── __init__.py
 │   ├── emulator.py            # OperationEmulator 主类
 │   │
@@ -277,7 +272,9 @@ agent_sim-emulator/
 │   │   ├── tool.py            # Tool 定义与执行
 │   │   ├── task.py            # Task 定义
 │   │   ├── verifier.py        # Rule-based 验证器
-│   │   └── trace.py           # 轨迹记录
+│   │   ├── trace.py           # 轨迹记录
+│   │   ├── registry.py        # ★ 场景注册系统 (新增)
+│   │   └── interface.py       # ★ 环境接口适配器 (新增)
 │   │
 │   ├── multi_agent/           # 多 Agent 框架
 │   │   ├── __init__.py
@@ -291,32 +288,20 @@ agent_sim-emulator/
 │   │   ├── __init__.py
 │   │   └── simulator.py       # 指令/内容/反馈生成器
 │   │
-│   ├── harness/               # Harness 层
-│   │   ├── __init__.py
-│   │   ├── state_compiler.py
-│   │   ├── candidate_actions.py
-│   │   ├── safety_gate.py
-│   │   └── verifier_feedback.py
-│   │
-│   └── scenarios/             # 场景定义
+│   └── scenarios/             # 场景定义 (插件目录)
 │       ├── file_ops/
-│       │   ├── state.py
-│       │   ├── tools.py
-│       │   ├── tasks.yaml
-│       │   ├── verifier.py
-│       │   └── seeds/
 │       ├── email_ops/
 │       └── crm_ops/
 │
-├── tests/                     # 测试用例
-│   ├── test_emulator.py
-│   ├── test_multi_agent.py
-│   └── test_scenarios.py
+├── examples/                  # 使用示例
+│   ├── usage_examples.py      # ★ 完整使用示例 (新增)
+│   └── scenarios/             # 示例场景
+│       └── email_scenario.py  # ★ 邮件场景示例 (新增)
 │
-└── examples/                  # 使用示例
-    ├── single_agent_demo.py
-    ├── multi_agent_demo.py
-    └── harness_demo.py
+└── tests/                     # 测试用例
+    ├── test_emulator.py
+    ├── test_multi_agent.py
+    └── test_scenarios.py
 ```
 
 ---

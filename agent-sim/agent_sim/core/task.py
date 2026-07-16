@@ -120,7 +120,12 @@ class ScenarioDefinition:
     tools: Dict[str, List[str]] = field(default_factory=dict)
     
     # Task list
-    tasks: List[str] = field(default_factory=list)
+    tasks: List[TaskDefinition] = field(default_factory=list)
+    
+    # Alias for backward compatibility
+    @property
+    def id(self) -> str:
+        return self.scenario_id
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ScenarioDefinition":
