@@ -1,9 +1,12 @@
 """
-TinyAct Emulator - Main Package
+Agent Sim - Main Package
+
+A pluggable agent interaction simulation platform for developing and testing 
+agents of all capabilities in controlled, realistic scenarios.
 """
 
-__version__ = "0.1.0"
-__author__ = "TinyAct Team"
+__version__ = "0.2.0"
+__author__ = "Agent Sim Team"
 
 from .emulator import OperationEmulator
 from .core import (
@@ -19,9 +22,21 @@ from .core import (
     SuccessCheck,
     Verifier,
     VerificationResult,
-    TraceRecorder,
-    EpisodeTrace,
+    Trace,
     StepRecord,
+    ToolCallRecord,
+    # Registry & Plugins
+    Registry,
+    Plugin,
+    registry,
+    get_registry,
+    register,
+    # Environment Interface
+    EnvironmentInterface,
+    EnvironmentInfo,
+    EnvironmentCapability,
+    AgentEnvironmentAdapter,
+    create_environment_adapter,
 )
 from .multi_agent import (
     AgentRole,
@@ -70,9 +85,23 @@ __all__ = [
     "SuccessCheck",
     "Verifier",
     "VerificationResult",
-    "TraceRecorder",
-    "EpisodeTrace",
+    "Trace",
     "StepRecord",
+    "ToolCallRecord",
+    
+    # Registry & Plugins
+    "Registry",
+    "Plugin",
+    "registry",
+    "get_registry",
+    "register",
+    
+    # Environment Interface
+    "EnvironmentInterface",
+    "EnvironmentInfo",
+    "EnvironmentCapability",
+    "AgentEnvironmentAdapter",
+    "create_environment_adapter",
     
     # Multi-Agent
     "AgentRole",
