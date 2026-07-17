@@ -1,123 +1,165 @@
-# Agent-Sim Framework
+# AgentSim
 
-A modular, multi-agent simulation framework where the **Environment** is the core kernel, providing standard interfaces for pluggable **Runtimes** and **Agents**. Features built-in **Trace Monitoring** for full observability and a **Sandboxed File System** for secure execution.
+**AgentSim** 是一个基于 "LLM 负责真实感，Python 负责可靠性" 理念构建的智能体模拟评估框架。它通过确定性的 Python 状态引擎管理隐藏状态和工具执行，利用 LLM 生成模糊的用户指令和自然语言反馈，旨在为智能体提供高保真、可复现且具备语义复杂度的测试环境。
 
-## 🏗 Architecture
+## 🚀 核心特性
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Defined Logic                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Runtime    │  │    Agent     │  │    Tools     │      │
-│  │  (Strategy)  │  │   (Logic)    │  │ (Capabilities)│      │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
-│         │                 │                 │               │
-└─────────┼─────────────────┼─────────────────┼───────────────┘
-          │                 │                 │
-┌─────────▼─────────────────▼─────────────────▼───────────────┐
-│                  Environment (Core Kernel)                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │ Shared State│  │Tool Registry│  │   Trace Monitor     │ │
-│  │ (Blackboard)│  │ (Sandboxed) │  │ (Built-in Observer) │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │           Sandboxed File System                       │ │
-│  │  All I/O confined to ./sandbox (Security Boundary)    │ │
-│  └───────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+- **混合架构**：Python 处理确定性逻辑（状态转移、风险判断），LLM 处理非确定性内容（用户意图、文本生成）。
+- **模块化设计**：基于 `Scenario` (场景) -> `Subject` (任务主体) -> `Tool` (工具) 的分层架构。
+- **移动端优先**：内置丰富的手机环境模拟工具（短信、联系人、系统设置、相册、浏览器等）。
+- **Benchmark 兼容**：设计之初即考虑与 AgentDojo、InjectAgent 等主流评测集的接口兼容。
+- **完整追踪**：内置 Trace 系统，记录完整的交互轨迹用于后续分析。
 
-## ✨ Key Features
-
-- **🔌 Pluggable Components**: Swap Runtimes (schedulers) and Agents (logic) without changing the core environment.
-- **🤝 Multi-Agent Collaboration**: Built-in support for role-based communication, message passing, and shared state.
-- **🔍 Comprehensive Tracing**: Every decision, tool call, and message is recorded for debugging and evaluation.
-- **🔒 Secure Execution**: File operations are strictly sandboxed to prevent system access.
-- **🛠 Extensible Tools**: Easy registration of custom capabilities with automatic validation.
-
-## 🚀 Quick Start
-
-### 1. Run the Demo
+## 📦 安装
 
 ```bash
+pip install agent-sim
+```
+
+*注：当前版本为开发版，也可通过源码安装：*
+```bash
+git clone https://github.com/your-repo/agent-sim.git
 cd agent-sim
-python demo_multi_agent.py
+pip install -e .
 ```
 
-This runs a multi-agent scenario where:
-- A **Planner** delegates a math task (`25 * 4`)
-- An **Executor** calculates and saves the result to a file
-- Full trace is saved to `trace_log.json`
+## 🛠️ 快速开始
 
-### 2. Verify Results
+### 1. 导入与初始化
 
-```bash
-# Check the created file (sandboxed)
-cat sandbox/output.txt
+```python
+from agent_sim import Scenario, ToolExecutor
+from agent_sim.scenarios import EmailScenario, MobileScenario
 
-# View the execution trace
-cat trace_log.json | jq '.events[:5]'  # First 5 events
+# 实例化一个邮件场景
+scenario = EmailScenario()
+executor = scenario.get_executor()
+
+# 或者实例化一个包含多个主体的移动端场景
+mobile_scenario = MobileScenario(
+    subjects=['contacts', 'sms', 'calendar', 'settings', 'gallery', 'browser']
+)
+mobile_executor = mobile_scenario.get_executor()
 ```
 
-## 📂 Project Structure
+### 2. 执行工具调用
+
+```python
+# 模拟 Agent 调用工具
+result = executor.execute_tool(
+    tool_name="send_email",
+    arguments={
+        "to": "boss@example.com",
+        "subject": "Project Update",
+        "body": "The project is on track."
+    }
+)
+
+print(result.success)  # True
+print(result.observation)  # "Email sent successfully."
+```
+
+### 3. 获取观察值 (Observation)
+
+```python
+# 获取当前环境的可见状态（经过观察编译器处理）
+observation = scenario.get_observation(executor.state)
+print(observation)
+```
+
+## 🏗️ 架构理念
+
+AgentSim 严格区分 **环境层 (Environment)** 和 **智能体层 (Agent)**：
+
+| 组件 | 负责方 | 职责 |
+| :--- | :--- | :--- |
+| **隐藏状态** | Python | 维护真实的邮件列表、文件树、数据库状态 |
+| **工具执行** | Python | 确定性执行 `send_email`, `delete_file` 等操作 |
+| **成功/风险验证** | Python | 基于规则判断操作是否成功或存在风险 |
+| **用户指令** | LLM | 生成模糊、多义、带有潜台词的任务描述 |
+| **内容生成** | LLM | 生成邮件正文、短信内容、文件名等自然语言数据 |
+| **反馈描述** | LLM | 将工具执行结果转化为自然的语言反馈 |
+
+## 📱 内置任务主体 (Subjects)
+
+框架内置了多种高保真的移动端任务主体，可直接组合使用：
+
+### 通信与办公
+- **Email**: 邮件收发、标签管理、归档 (`list_emails`, `send_email`, `add_label`)
+- **SMS/Messaging**: 短信会话管理、未读统计 (`send_sms`, `list_conversations`)
+- **Contacts**: 联系人增删改查、分组管理 (`add_contact`, `search_contacts`)
+
+### 系统与生活
+- **System Settings**: WiFi/蓝牙控制、音量亮度、勿扰模式 (`toggle_wifi`, `set_brightness`)
+- **Calendar**: 日程创建、冲突检测、多日历视图 (`create_event`, `list_events`)
+- **Alarm/Reminder**: 闹钟设置与管理
+
+### 多媒体与网络
+- **Photo Gallery**: 相册浏览、标签搜索、favorites (`search_photos`, `create_album`)
+- **Browser**: 标签页管理、书签、历史记录 (`navigate_to`, `add_bookmark`)
+- **Clipboard**: 剪贴板历史、置顶、格式识别 (`copy_text`, `get_history`)
+
+## 🔌 Benchmark 兼容性
+
+AgentSim 提供了适配层以兼容现有的评测基准：
+
+### AgentDojo 兼容
+```python
+from agent_sim.compat import AgentDojoAdapter
+
+adapter = AgentDojoAdapter(scenario="email")
+# 自动映射 AgentDojo 的任务格式到 AgentSim 的内部表示
+task = adapter.load_task(task_id="001")
+```
+
+### InjectAgent 兼容
+```python
+from agent_sim.compat import InjectAgentAdapter
+
+adapter = InjectAgentAdapter()
+# 支持注入式攻击场景的模拟
+env = adapter.wrap_environment(base_scenario="mobile")
+```
+
+*(注：具体适配接口正在持续完善中，详见 `agent_sim/compat/` 目录)*
+
+## 📂 项目结构
 
 ```
 agent-sim/
-├── environment.py        # Core kernel (State, Tools, Monitor)
-├── runtime.py            # Runtime strategies (Single, Multi-Agent)
-├── agents.py             # Agent interface & mock implementations
-├── tools.py              # Tool registry & built-in tools
-├── trace_monitor.py      # Observability system
-├── demo_multi_agent.py   # End-to-end demonstration
-├── sandbox/              # Secure file operation directory
-├── progress.md           # Development progress log
-└── README.md             # This file
+├── agent_sim/              # 核心包
+│   ├── core/               # 核心引擎 (State, Executor, Verifier)
+│   ├── scenarios/          # 场景定义 (Email, Mobile, etc.)
+│   ├── subjects/           # 任务主体实现 (Contacts, SMS, Settings...)
+│   ├── compat/             # 第三方 Benchmark 适配层
+│   └── utils/              # 工具函数 (Trace, Logger)
+├── examples/               # 使用示例
+├── tests/                  # 单元测试
+└── README.md
 ```
 
-## 🧩 Core Components
+## 🧪 运行测试
 
-### Environment
-The central orchestrator managing:
-- Global shared state
-- Tool registration and execution
-- Trace monitoring
-- Sandbox enforcement
+确保所有工具主体和场景正常工作：
 
-### Runtime
-Defines **how** agents collaborate:
-- `SingleAgentRuntime`: Simple loop for single agents
-- `MultiAgentRuntime`: Round-robin scheduler with message queues
-- *Extensible*: Implement custom strategies (Hierarchical, Market, etc.)
+```bash
+# 运行核心兼容性测试
+python tests/test_compatibility.py
 
-### Agent
-Defines **what** logic each role performs:
-- Implements `decide()` method
-- Receives state and available tools
-- Returns actions (call_tool, send_message, finish)
+# 运行移动端主体专项测试
+python tests/test_mobile_subjects.py
 
-### Trace Monitor
-Built-in observer recording:
-- Agent decisions
-- Tool invocations and results
-- Inter-agent messages
-- System lifecycle events
+# 运行完整场景演示
+python examples/usage_examples.py
+```
 
-## 🔐 Security Model
+## 🤝 贡献指南
 
-All file operations are confined to the `./sandbox` directory:
-- Paths are normalized to prevent traversal (`../`)
-- Attempts to access files outside sandbox are blocked
-- Safe for running untrusted agent code
+欢迎提交 Issue 和 Pull Request！特别是在以下方面：
+1. 新增更多垂直领域的任务主体（如银行、医疗、电商）。
+2. 完善对 AgentDojo、InjectAgent 等基准的适配。
+3. 优化 LLM 与 Python 的交互协议。
 
-## 📈 Next Steps
+## 📄 许可证
 
-- [ ] Add more Runtime strategies (Hierarchical, Market-based)
-- [ ] Integrate real LLM Agents (OpenAI, Anthropic, Local)
-- [ ] Build Trace visualizer (timeline view)
-- [ ] Add concurrency for parallel agent execution
-- [ ] Implement evaluation metrics based on traces
-
-## 📄 License
-
-MIT
+MIT License
