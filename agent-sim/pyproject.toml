@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-sim"
+version = "0.3.0"
+description = "A pluggable agent interaction simulation platform with LLM-powered environments and deterministic tool execution"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Agent Sim Team", email = "team@agentsim.dev"}
+]
+keywords = [
+    "agent",
+    "simulation",
+    "llm",
+    "environment",
+    "testing",
+    "benchmark",
+    "multi-agent",
+    "tool-use"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "typing-extensions>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+llm = [
+    "openai>=1.0",
+    "anthropic>=0.20",
+]
+benchmark = [
+    "agentdojo>=0.1",
+    "injectagent>=0.1",
+]
+all = [
+    "agent-sim[dev,llm,benchmark]",
+]
+
+[project.urls]
+Homepage = "https://github.com/agent-sim/agent-sim"
+Documentation = "https://agent-sim.readthedocs.io"
+Repository = "https://github.com/agent-sim/agent-sim"
+Issues = "https://github.com/agent-sim/agent-sim/issues"
+Changelog = "https://github.com/agent-sim/agent-sim/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent_sim*"]
+exclude = ["examples*", "tests*"]
+
+[tool.setuptools.package-data]
+agent_sim = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
