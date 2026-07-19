@@ -7,12 +7,14 @@ Tests for contacts, SMS, calendar, system settings, photo gallery, and browser s
 import sys
 from datetime import datetime, timedelta
 
-from agent_sim.examples.scenarios.contacts_subject import ContactsTools
-from agent_sim.examples.scenarios.sms_subject import SMSTools
-from agent_sim.examples.scenarios.calendar_subject import CalendarTools
-from agent_sim.examples.scenarios.system_settings_subject import create_system_settings_executor, SystemSettingsState
-from agent_sim.examples.scenarios.photo_gallery_subject import create_photo_gallery_executor, PhotoGalleryState
-from agent_sim.examples.scenarios.browser_subject import create_browser_executor, BrowserState
+sys.path.insert(0, '/workspace/agent-sim')
+
+from examples.scenarios.contacts_subject import ContactsTools
+from examples.scenarios.sms_subject import SMSTools
+from examples.scenarios.calendar_subject import CalendarTools
+from examples.scenarios.system_settings_subject import create_system_settings_executor, SystemSettingsState
+from examples.scenarios.photo_gallery_subject import create_photo_gallery_executor, PhotoGalleryState
+from examples.scenarios.browser_subject import create_browser_executor, BrowserState
 
 
 def test_contacts():
@@ -113,19 +115,22 @@ def test_sms():
     conversations = sms.list_conversations()
     print(f"   Total conversations: {len(conversations)}")
     for conv in conversations:
-        print(f"      - {conv['phone']}: {conv['message_count']} messages")
+        print(f"      - {conv['phone_number']}: {conv['total_count']} messages")
     
     # 3. Get conversation messages
     print("\n3. Getting conversation messages...")
-    messages = sms.get_conversation("13800138001")
+    messages = sms.list_messages("13800138001")
     print(f"   Messages with 13800138001: {len(messages)}")
     for msg in messages:
-        print(f"      [{msg['direction']}] {msg['body']}")
+        print(f"      [{msg['direction']}] {msg['content']}")
     
     # 4. Mark as read
     print("\n4. Marking messages as read...")
-    sms.mark_as_read("13800138001")
-    print("   Marked all messages from 13800138001 as read")
+    # Get a message ID to mark as read
+    messages = sms.list_messages("13800138001")
+    if messages:
+        sms.mark_as_read(messages[0]['id'])
+        print(f"   Marked message {messages[0]['id']} as read")
     
     # 5. Delete conversation
     print("\n5. Deleting conversation...")
@@ -135,9 +140,10 @@ def test_sms():
     
     # 6. Get stats
     print("\n6. Getting statistics...")
-    stats = sms.get_stats()
-    print(f"   Total messages: {stats['total_messages']}")
-    print(f"   Unread count: {stats['unread_count']}")
+    all_messages = sms.list_messages()
+    unread_count = sum(1 for m in all_messages if not m['is_read'])
+    print(f"   Total messages: {len(all_messages)}")
+    print(f"   Unread count: {unread_count}")
     
     print("\n✓ SMS functionality test passed!\n")
     return True
@@ -248,19 +254,19 @@ def test_system_settings():
     # 1. Get all settings
     print("\n1. Getting all settings...")
     all_settings = call_tool("get_all_settings")
-    print(f"   WiFi: {all_settings['wifi']['enabled']}")
-    print(f"   Bluetooth: {all_settings['bluetooth']['enabled']}")
-    print(f"   Volume: {all_settings['volume']['media']}")
+    print(f"   WiFi: {'ON' if all_settings['wifi_enabled'] else 'OFF'}")
+    print(f"   Bluetooth: {'ON' if all_settings['bluetooth_enabled'] else 'OFF'}")
+    print(f"   Volume: {all_settings['media_volume']}")
     
     # 2. Toggle WiFi
     print("\n2. Toggling WiFi...")
     wifi_state = call_tool("toggle_wifi", {"enabled": False})
-    print(f"   WiFi is now: {'ON' if wifi_state['enabled'] else 'OFF'}")
+    print(f"   WiFi is now: {'ON' if wifi_state['wifi_enabled'] else 'OFF'}")
     
     # 3. Set volume
     print("\n3. Setting volume...")
     volume = call_tool("set_volume", {"volume_type": "media", "level": 75})
-    print(f"   Media volume set to: {volume['media']}")
+    print(f"   Media volume set to: {volume['level']}")
     
     # 4. Toggle airplane mode
     print("\n4. Toggling airplane mode...")
