@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-sim"
+dynamic = ["version"]
+description = "A pluggable agent interaction simulation platform with LLM-powered environments and deterministic tool execution"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [
+    {name = "Agent Sim Team", email = "team@agentsim.dev"}
+]
+keywords = [
+    "agent",
+    "simulation",
+    "llm",
+    "environment",
+    "testing",
+    "benchmark",
+    "multi-agent",
+    "tool-use"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "ruff>=0.1",
+]
+[project.urls]
+Homepage = "https://github.com/yeasen-z/agent-sim"
+Repository = "https://github.com/yeasen-z/agent-sim"
+Issues = "https://github.com/yeasen-z/agent-sim/issues"
+Changelog = "https://github.com/yeasen-z/agent-sim/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agent_sim*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "agent_sim.__version__"}
+
+[tool.setuptools.package-data]
+agent_sim = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
