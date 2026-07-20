@@ -13,6 +13,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Consolidated packaging and development configuration in `pyproject.toml`.
 - Removed generated caches and package metadata from version control.
 - Declared the runtime dependency on PyYAML.
+- Moved the bundled simulation environments into the installable
+  `agent_sim.scenarios` package.
 
 ## [0.2.0] - 2026-07-19
 

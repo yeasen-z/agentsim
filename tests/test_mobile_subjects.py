@@ -6,15 +6,15 @@ Tests for contacts, SMS, calendar, system settings, photo gallery, and browser s
 
 from datetime import datetime, timedelta
 
-from examples.scenarios.browser_subject import BrowserState, create_browser_executor
-from examples.scenarios.calendar_subject import CalendarTools
-from examples.scenarios.contacts_subject import ContactsTools
-from examples.scenarios.photo_gallery_subject import (
+from agent_sim.scenarios.browser_subject import BrowserState, create_browser_executor
+from agent_sim.scenarios.calendar_subject import CalendarTools
+from agent_sim.scenarios.contacts_subject import ContactsTools
+from agent_sim.scenarios.photo_gallery_subject import (
     PhotoGalleryState,
     create_photo_gallery_executor,
 )
-from examples.scenarios.sms_subject import SMSTools
-from examples.scenarios.system_settings_subject import (
+from agent_sim.scenarios.sms_subject import SMSTools
+from agent_sim.scenarios.system_settings_subject import (
     SystemSettingsState,
     create_system_settings_executor,
 )

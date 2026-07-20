@@ -23,7 +23,7 @@ def example_1_programmatic_registration():
     print("=" * 60)
 
     # Import a scenario module
-    from examples.scenarios.email_scenario import (
+    from agent_sim.scenarios.email_scenario import (
         compile_email_observation,
         create_email_verifier,
         init_email_state,
@@ -35,7 +35,7 @@ def example_1_programmatic_registration():
         id="email_demo",
         name="Email Demo",
         description="Simple email management demo",
-        module="examples.scenarios.email_scenario",
+        module="agent_sim.scenarios.email_scenario",
         init_state=init_email_state,
         register_tools=register_email_tools,
         create_verifier=create_email_verifier,
@@ -57,7 +57,7 @@ def example_2_decorator_registration():
     # We need to reload to trigger the decorator registration
     import importlib
 
-    from examples.scenarios import email_scenario
+    from agent_sim.scenarios import email_scenario
 
     importlib.reload(email_scenario)  # Force re-execution of decorators
 

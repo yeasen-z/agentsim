@@ -6,8 +6,8 @@ Demonstrates how to use agent_sim after installing via pip install -e .
 
 import agent_sim
 
-# Import scenarios
-from examples.scenarios import (
+# Import built-in scenarios from the installed package
+from agent_sim.scenarios import (
     BrowserState,
     CalendarState,
     ContactsState,

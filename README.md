@@ -23,7 +23,7 @@ an LLM without allowing it to decide whether a task succeeded.
 - Pluggable scenario registry and environment adapters
 - LLM simulation interfaces with no required provider SDK
 - Multi-agent roles and orchestration primitives
-- Example mobile scenarios for contacts, SMS, calendar, settings, gallery,
+- Built-in scenarios for contacts, SMS, calendar, settings, gallery,
   browser, clipboard, and email workflows
 
 ## Requirements
@@ -104,14 +104,16 @@ trace = emulator.get_trace()
 ```
 
 `OperationEmulator` is configured with a scenario, state initializer, tool
-executor, verifier, and optional observation compiler. See
-[`examples/`](examples/) for complete scenario implementations and runtime
-integration examples.
+executor, verifier, and optional observation compiler. Built-in scenario
+implementations are available from `agent_sim.scenarios`; see [`examples/`](examples/)
+for runtime integration examples.
 
 ## Public modules
 
 - `agent_sim.core`: state, tools, tasks, verification, tracing, registry, and
   environment interfaces
+- `agent_sim.scenarios`: built-in contacts, SMS, calendar, settings, gallery,
+  browser, clipboard, and email simulation environments
 - `agent_sim.agents`: LLM client adapters and agent helpers
 - `agent_sim.llm_sim`: instruction, content, feedback, and user simulators
 - `agent_sim.multi_agent`: roles, agents, messages, and orchestration
@@ -126,8 +128,9 @@ agent-sim/
 │   ├── agents/
 │   ├── llm_sim/
 │   ├── multi_agent/
+│   ├── scenarios/
 │   └── emulator.py
-├── examples/            # Example scenarios and integrations
+├── examples/            # Runtime and package integration examples
 ├── tests/               # Test suite
 ├── pyproject.toml       # Package and tool configuration
 └── README.md
@@ -147,9 +150,9 @@ python -m build
 ## Project scope
 
 Agent Sim provides simulation infrastructure rather than a GUI emulator, a
-hosted service, or a benchmark dataset. The mobile-domain subjects under
-`examples/` demonstrate how scenarios can be built; they are not installed as
-part of the `agent_sim` package.
+hosted service, or a benchmark dataset. The scenarios under
+`agent_sim.scenarios` are installed with the package and can be imported by
+downstream projects.
 
 ## Contributing
 
