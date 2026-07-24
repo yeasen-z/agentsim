@@ -1,301 +1,146 @@
-"""
-Example: Implementing a Custom Runtime for agent-sim
+"""Implement custom runtimes against Agent Sim's canonical interfaces."""
 
-This example demonstrates how to implement your own Runtime that works
-with the agent-sim framework by following the standard interfaces.
-"""
+from typing import Any, Dict, List, Optional
 
-from typing import Any, Dict, List
-
-from agent_sim.core.interfaces import (
+from agentsim import (
     Action,
-    AgentInterface,
-    EnvironmentInterface,
-    ExecutionResult,
+    AgentAPI,
+    Env,
+    RunResult,
+    TaskDefine,
 )
 
 
-class SimpleSingleAgentRuntime:
-    """
-    A simple single-agent runtime implementation.
+def _tools_for_agent(env: Env) -> List[Dict[str, Any]]:
+    return [tool.to_dict() for tool in env.tools()]
 
-    This runtime:
-    1. Resets the environment
-    2. Loops: observe → agent.decide() → execute action
-    3. Terminates when: max_steps, agent returns result, or verification succeeds/fails
-    4. Records all interactions in the environment's trace monitor
-    """
+
+class SimpleSingleAgentRuntime:
+    """Drive one agent until it finishes or exhausts the step budget."""
 
     def __init__(self, max_steps: int = 10):
         self.max_steps = max_steps
 
     def run(
-        self, env: EnvironmentInterface, agent: AgentInterface, config: Dict[str, Any] = None
-    ) -> ExecutionResult:
-        """
-        Run an agent in the environment.
-
-        This is the main execution loop that:
-        1. Initializes the episode
-        2. Repeats: observe → decide → act
-        3. Returns final result with trace
-        """
+        self,
+        env: Env,
+        agent: AgentAPI,
+        task: TaskDefine,
+        instruction: str = "",
+        config: Optional[Dict[str, Any]] = None,
+    ) -> RunResult:
         config = config or {}
-        instruction = config.get("instruction", "Complete the task")
-        task_id = config.get("task_id", "default_task")
-        seed = config.get("seed", 42)
-
-        # Reset both environment and agent
-        env.reset(task_id=task_id, seed=seed, instruction=instruction)
+        instruction = instruction or task.description or "Complete the task"
+        observation = env.reset(task, seed=config.get("seed", 42), instruction=instruction)
         agent.reset()
 
-        # Get initial observation
-        observation = env.observe()
-        available_tools = env.get_tools()
-
-        step_count = 0
         action_history: List[Action] = []
+        returned_result = ""
 
-        # Main execution loop
-        while step_count < self.max_steps:
-            step_count += 1
-
-            # Agent decides on action
-            action = agent.decide(
+        for _ in range(self.max_steps):
+            tool_name, arguments = agent.act(
+                instruction=instruction,
                 observation=observation,
-                available_tools=available_tools,
-                context={"step": step_count, "history": action_history},
+                available_tools=_tools_for_agent(env),
+                context={
+                    "step": len(action_history) + 1,
+                    "history": [action.to_dict() for action in action_history],
+                },
             )
 
-            # Record action
-            action_history.append(action)
-
-            # Execute action through environment
-            if action.action_type == "call_tool":
-                # Call tool through environment
-                result = env.call_tool(tool_name=action.tool_name, args=action.arguments)
-
-                # Get new observation
-                observation = env.observe()
-
-                # Check if we should continue
-                if not result.success:
-                    # Tool failed - agent might want to try something else
-                    continue
-
-            elif action.action_type == "return_result":
-                # Agent wants to finish
+            if tool_name in {None, "finish"}:
+                returned_result = str((arguments or {}).get("result", ""))
+                action_history.append(Action("return_result", result=returned_result))
                 break
 
-            elif action.action_type == "textual":
-                # Textual action (thinking, etc.) - just continue
+            if tool_name == "think":
+                action_history.append(
+                    Action("textual", result=str((arguments or {}).get("message", "")))
+                )
                 continue
 
-            # Check verification
-            verification = env.verify()
-            if verification.get("success") or verification.get("failed"):
+            action = Action("call_tool", tool_name=tool_name, arguments=arguments or {})
+            action_history.append(action)
+            env.call(tool_name, action.arguments)
+            observation = env.observe()
+
+            if env.done():
                 break
 
-        # Get final verification
-        final_verification = env.verify()
-
-        # Get trace from environment monitor
-        trace = env.get_trace()
-        trace_available = trace is not None
-
-        # Determine status
-        if final_verification.get("success"):
-            status = "success"
-        elif final_verification.get("failed"):
-            status = "failed"
-        elif step_count >= self.max_steps:
-            status = "max_steps_reached"
-        else:
-            status = "finished"
-
-        return ExecutionResult(
+        episode = env.result()
+        status = "finished" if returned_result else "max_steps_reached"
+        return RunResult(
             status=status,
-            result=final_verification.get("reason", ""),
-            steps_taken=step_count,
-            trace_available=trace_available,
+            result=returned_result,
+            steps_taken=episode["steps_taken"],
+            trace_available=env.trace() is not None,
             metadata={
-                "verification": final_verification,
-                "actions": [a.to_dict() for a in action_history],
+                "actions": [action.to_dict() for action in action_history],
+                "episode": episode,
             },
         )
 
 
 class HumanInLoopRuntime:
-    """
-    Example of a custom runtime with human feedback.
-
-    This runtime pauses at each step to get human input before executing.
-    Useful for debugging, training, or safety-critical applications.
-    """
+    """Ask for approval before each tool call."""
 
     def __init__(self, max_steps: int = 10, require_approval: bool = True):
         self.max_steps = max_steps
         self.require_approval = require_approval
 
     def run(
-        self, env: EnvironmentInterface, agent: AgentInterface, config: Dict[str, Any] = None
-    ) -> ExecutionResult:
-        """Run with human-in-the-loop."""
+        self,
+        env: Env,
+        agent: AgentAPI,
+        task: TaskDefine,
+        instruction: str = "",
+        config: Optional[Dict[str, Any]] = None,
+    ) -> RunResult:
         config = config or {}
-
-        # Initialize
-        env.reset(
-            task_id=config.get("task_id", "default"),
-            seed=config.get("seed", 42),
-            instruction=config.get("instruction", ""),
-        )
+        instruction = instruction or task.description or "Complete the task"
+        observation = env.reset(task, seed=config.get("seed", 42), instruction=instruction)
         agent.reset()
+        returned_result = ""
 
-        observation = env.observe()
-        available_tools = env.get_tools()
-
-        step_count = 0
-
-        print(f"\n{'='*60}")
-        print("HUMAN-IN-THE-LOOP RUNTIME STARTED")
-        print(f"{'='*60}\n")
-
-        while step_count < self.max_steps:
-            step_count += 1
-
-            # Agent decides
-            action = agent.decide(
+        for step in range(1, self.max_steps + 1):
+            tool_name, arguments = agent.act(
+                instruction=instruction,
                 observation=observation,
-                available_tools=available_tools,
-                context={"step": step_count},
+                available_tools=_tools_for_agent(env),
+                context={"step": step},
             )
 
-            print(f"\n--- Step {step_count} ---")
-            print(f"Agent wants to: {action.action_type}")
-            if action.tool_name:
-                print(f"Tool: {action.tool_name}")
-                print(f"Arguments: {action.arguments}")
+            if tool_name in {None, "finish"}:
+                returned_result = str((arguments or {}).get("result", ""))
+                break
+            if tool_name == "think":
+                continue
 
-            # Human approval
-            if self.require_approval and action.action_type == "call_tool":
-                approval = input("\nExecute this action? (y/n/skip): ").lower()
-                if approval == "n":
-                    print("Action cancelled by human.")
-                    continue
-                elif approval == "skip":
-                    print("Skipping to next step.")
-                    step_count -= 1  # Don't count skipped steps
+            if self.require_approval:
+                approval = input(f"Execute {tool_name} with {arguments or {}}? (y/n): ").lower()
+                if approval != "y":
                     continue
 
-            # Execute
-            if action.action_type == "call_tool":
-                result = env.call_tool(tool_name=action.tool_name, args=action.arguments)
-                observation = env.observe()
-                print(f"Result: {result}")
-
-            elif action.action_type == "return_result":
-                print(f"\nAgent finished with result: {action.result}")
+            env.call(tool_name, arguments or {})
+            observation = env.observe()
+            if env.done():
                 break
 
-            # Check done
-            verification = env.verify()
-            if verification.get("success") or verification.get("failed"):
-                print(f"\nVerification: {verification}")
-                break
-
-        # Final result
-        trace = env.get_trace()
-        verification = env.verify()
-
-        status = "success" if verification.get("success") else "failed"
-
-        print(f"\n{'='*60}")
-        print(f"RUNTIME FINISHED - Status: {status}")
-        print(f"Steps taken: {step_count}")
-        print(f"Trace available: {trace is not None}")
-        print(f"{'='*60}\n")
-
-        return ExecutionResult(
-            status=status,
-            result=verification.get("reason", ""),
-            steps_taken=step_count,
-            trace_available=trace is not None,
-            metadata={"verification": verification},
+        episode = env.result()
+        return RunResult(
+            status="finished" if returned_result else "max_steps_reached",
+            result=returned_result,
+            steps_taken=episode["steps_taken"],
+            trace_available=env.trace() is not None,
+            metadata={"episode": episode},
         )
 
 
-# ============================================================================
-# Usage Example
-# ============================================================================
-
-
-def demo_custom_runtime():
-    """Demonstrate using a custom runtime with agent-sim."""
-
-    print(
-        """
-    ╔══════════════════════════════════════════════════════════╗
-    ║  Custom Runtime Example for Agent-Sim Framework         ║
-    ╚══════════════════════════════════════════════════════════╝
-
-    This example shows how to implement and use custom Runtimes
-    that work with the agent-sim environment framework.
-
-    Key Points:
-    -----------
-    1. Implement RuntimeInterface.run() method
-    2. Use EnvironmentInterface to interact with environment
-    3. Use AgentInterface to get decisions from agent
-    4. Trace is automatically recorded by the environment
-    5. Return ExecutionResult with status and metadata
-
-    Benefits:
-    ---------
-    ✓ Swap different Runtimes without changing environment
-    ✓ Add custom logic (human approval, RL training, etc.)
-    ✓ Full control over execution flow
-    ✓ Access to complete trace for analysis
-    """
-    )
-
-    # Example 1: Simple runtime
-    print("\n" + "=" * 60)
-    print("Example 1: SimpleSingleAgentRuntime")
-    print("=" * 60)
-
-    runtime1 = SimpleSingleAgentRuntime(max_steps=5)
-    print(f"✓ Created runtime with max_steps={runtime1.max_steps}")
-    print("✓ Implements RuntimeInterface")
-    print("✓ Can be used with any EnvironmentInterface + AgentInterface")
-
-    # Example 2: Human-in-loop runtime
-    print("\n" + "=" * 60)
-    print("Example 2: HumanInLoopRuntime")
-    print("=" * 60)
-
-    HumanInLoopRuntime(max_steps=5, require_approval=True)
-    print("✓ Created runtime with human approval")
-    print("✓ Pauses at each step for human input")
-    print("✓ Useful for debugging and safety-critical tasks")
-
-    # Example 3: What you could build
-    print("\n" + "=" * 60)
-    print("What You Could Build:")
-    print("=" * 60)
-    print(
-        """
-    - MultiAgentRuntime: Coordinate multiple agents
-    - RLTrainingRuntime: Train agents with reinforcement learning
-    - BatchRuntime: Run multiple episodes in parallel
-    - CurriculumRuntime: Progressive difficulty increase
-    - SafetyRuntime: Add safety checks before execution
-    - DebugRuntime: Step-through debugging with breakpoints
-    """
-    )
-
-    print("\n" + "=" * 60)
-    print("See ARCHITECTURE_REDESIGN.md for full details")
-    print("=" * 60)
+def demo_custom_runtime() -> None:
+    """Print the extension points without starting an interactive episode."""
+    print("Custom runtimes implement RuntimeAPI.run().")
+    print("They use Env and AgentAPI only.")
+    print("The environment records Trace; benchmark evaluation runs afterwards.")
 
 
 if __name__ == "__main__":

@@ -3,13 +3,13 @@ requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-sim"
+name = "agentsim"
 dynamic = ["version"]
 description = "A pluggable agent interaction simulation platform with LLM-powered environments and deterministic tool execution"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "Agent Sim Team", email = "team@agentsim.dev"}
 ]
@@ -29,7 +29,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -37,7 +36,12 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
+    "deepdiff>=8.6.1",
+    "docstring-parser>=0.15",
+    "email-validator>=2.0",
+    "pydantic>=2.7.1",
     "PyYAML>=6.0",
+    "typing-extensions>=4.11",
 ]
 
 [project.optional-dependencies]
@@ -56,20 +60,29 @@ Changelog = "https://github.com/yeasen-z/agent-sim/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["agent_sim*"]
+include = ["agentsim*"]
 
 [tool.setuptools.dynamic]
-version = {attr = "agent_sim.__version__"}
+version = {attr = "agentsim.__version__"}
 
 [tool.setuptools.package-data]
-agent_sim = ["py.typed"]
+agentsim = [
+    "py.typed",
+    "benchmark/agentdojo/*.md",
+    "benchmark/agentdojo/*.yaml",
+    "benchmark/agentdojo/docs/*.md",
+    "benchmark/agentdojo/_vendor/data/suites/*/*.yaml",
+    "benchmark/agentdojo/_vendor/data/suites/*/include/*.yaml",
+]
 
 [tool.black]
 line-length = 100
-target-version = ['py39', 'py310', 'py311', 'py312']
+target-version = ['py310', 'py311', 'py312']
+extend-exclude = "src/agentsim/benchmark/agentdojo/_vendor"
 
 [tool.ruff]
 line-length = 100
+exclude = ["src/agentsim/benchmark/agentdojo/_vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C4"]

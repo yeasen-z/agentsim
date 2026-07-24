@@ -1,13 +1,9 @@
-"""
-Example: Using Agent Sim as an Installed Package
+"""Repository example using Agent Sim with the toy environment pack."""
 
-Demonstrates how to use agent_sim after installing via pip install -e .
-"""
+import agentsim
 
-import agent_sim
-
-# Import built-in scenarios from the installed package
-from agent_sim.scenarios import (
+# Import toy environments from the repository examples
+from examples.scenarios import (
     BrowserState,
     CalendarState,
     ContactsState,
@@ -22,7 +18,7 @@ from agent_sim.scenarios import (
 
 def test_basic_import():
     """Test that the package can be imported and used"""
-    print(f"Agent Sim version: {agent_sim.__version__}")
+    print(f"Agent Sim version: {agentsim.__version__}")
 
     # Test creating tool executors for different mobile subjects
     create_contacts_executor()

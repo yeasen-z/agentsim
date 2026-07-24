@@ -10,6 +10,7 @@ htmlcov/
 # Packaging and virtual environments
 *.egg-info/
 build/
+tests/
 dist/
 .venv/
 venv/

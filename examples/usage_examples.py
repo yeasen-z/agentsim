@@ -7,11 +7,11 @@ Demonstrates how to use the pluggable architecture to:
 3. Run agents with discovered tools and capabilities
 """
 
-from agent_sim import (
-    OperationEmulator,
-    ScenarioDefinition,
-    TaskDefinition,
-    create_environment_adapter,
+from agentsim import (
+    EnvSim,
+    ScenarioDefine,
+    TaskDefine,
+    as_env,
     registry,
 )
 
@@ -23,9 +23,8 @@ def example_1_programmatic_registration():
     print("=" * 60)
 
     # Import a scenario module
-    from agent_sim.scenarios.email_scenario import (
+    from examples.scenarios.email_scenario import (
         compile_email_observation,
-        create_email_verifier,
         init_email_state,
         register_email_tools,
     )
@@ -35,10 +34,9 @@ def example_1_programmatic_registration():
         id="email_demo",
         name="Email Demo",
         description="Simple email management demo",
-        module="agent_sim.scenarios.email_scenario",
+        module="examples.scenarios.email_scenario",
         init_state=init_email_state,
         register_tools=register_email_tools,
-        create_verifier=create_email_verifier,
         compile_observation=compile_email_observation,
         tags=["demo", "email"],
     )
@@ -57,7 +55,7 @@ def example_2_decorator_registration():
     # We need to reload to trigger the decorator registration
     import importlib
 
-    from agent_sim.scenarios import email_scenario
+    from examples.scenarios import email_scenario
 
     importlib.reload(email_scenario)  # Force re-execution of decorators
 
@@ -67,7 +65,7 @@ def example_2_decorator_registration():
     plugin = registry.get("email_management_v2")
     if plugin:
         print("\nDecorator-registered scenario found:")
-        print(f"  ID: {plugin.scenario_id}")
+        print(f"  ID: {plugin.id}")
         print(f"  Name: {plugin.name}")
         print(f"  Tags: {plugin.tags}")
     print()
@@ -90,34 +88,33 @@ def example_3_discover_environment():
         print("No email scenario available, skipping this example")
         return
 
-    # Create the emulator with scenario components
-    from agent_sim.core import ToolExecutor
+    # Create the sim with scenario components
+    from agentsim.core import ToolExecutor
 
-    tool_executor = ToolExecutor()
-    plugin.tool_registrar(tool_executor)
+    executor = ToolExecutor()
+    plugin.register_tools(executor)
 
-    scenario_def = ScenarioDefinition(
-        scenario_id=plugin.scenario_id, name=plugin.name, description=plugin.description, tasks=[]
+    scenario_def = ScenarioDefine(
+        scenario_id=plugin.id, name=plugin.name, description=plugin.description, tasks=[]
     )
 
-    emulator = OperationEmulator(
+    sim = EnvSim(
         scenario=scenario_def,
-        state_initializer=plugin.state_initializer,
-        tool_executor=tool_executor,
-        verifier=plugin.verifier_factory(),
-        observation_compiler=plugin.observation_compiler,
+        init_state=plugin.init_state,
+        executor=executor,
+        compile_obs=plugin.compile_observation,
     )
 
     # Create environment adapter (this is what agents interact with)
-    env_adapter = create_environment_adapter(emulator)
+    env_adapter = as_env(sim)
 
     # Reset with a task
-    task = TaskDefinition(task_id="test_task", scenario=plugin.scenario_id, max_steps=10)
+    task = TaskDefine(task_id="test_task", scenario=plugin.id, max_steps=10)
 
-    emulator.reset(task, seed=42, instruction="Test task")
+    env_adapter.reset(task, seed=42, instruction="Test task")
 
     # Agent discovers environment info
-    env_info = env_adapter.get_environment_info()
+    env_info = env_adapter.info()
 
     print(f"\nEnvironment: {env_info.scenario_name}")
     print(f"Description: {env_info.description}")
@@ -155,38 +152,37 @@ def example_4_agent_interaction():
         print("No email scenario available, skipping this example")
         return
 
-    from agent_sim.core import ScenarioDefinition, TaskDefinition, ToolExecutor
+    from agentsim.core import ScenarioDefine, TaskDefine, ToolExecutor
 
-    # Setup emulator
-    tool_executor = ToolExecutor()
-    plugin.tool_registrar(tool_executor)
+    # Setup sim
+    executor = ToolExecutor()
+    plugin.register_tools(executor)
 
-    scenario_def = ScenarioDefinition(
-        scenario_id=plugin.scenario_id, name=plugin.name, description=plugin.description, tasks=[]
+    scenario_def = ScenarioDefine(
+        scenario_id=plugin.id, name=plugin.name, description=plugin.description, tasks=[]
     )
 
-    emulator = OperationEmulator(
+    sim = EnvSim(
         scenario=scenario_def,
-        state_initializer=plugin.state_initializer,
-        tool_executor=tool_executor,
-        verifier=plugin.verifier_factory(),
-        observation_compiler=plugin.observation_compiler,
+        init_state=plugin.init_state,
+        executor=executor,
+        compile_obs=plugin.compile_observation,
     )
 
     # Create adapter
-    env_adapter = create_environment_adapter(emulator)
+    env_adapter = as_env(sim)
 
     # Reset environment
-    task = TaskDefinition(task_id="read_emails", scenario=plugin.scenario_id, max_steps=5)
+    task = TaskDefine(task_id="read_emails", scenario=plugin.id, max_steps=5)
 
-    initial_obs = emulator.reset(task, seed=42, instruction="Read your emails")
+    initial_obs = env_adapter.reset(task, seed=42, instruction="Read your emails")
     print(f"\nInitial observation: {initial_obs}")
 
     # Simulate agent actions
     print("\n--- Agent Actions ---")
 
     # Action 1: List emails
-    result1 = env_adapter.call_tool("list_emails", {"folder": "inbox"})
+    result1 = env_adapter.call("list_emails", {"folder": "inbox"})
     print(f"\nAction 1 - list_emails: success={result1.success}")
     if result1.result:
         print(f"  Found {len(result1.result)} emails")
@@ -196,15 +192,15 @@ def example_4_agent_interaction():
     # Action 2: Read first email
     if result1.result and len(result1.result) > 0:
         email_id = result1.result[0]["id"]
-        result2 = env_adapter.call_tool("read_email", {"email_id": email_id})
+        result2 = env_adapter.call("read_email", {"email_id": email_id})
         print(f"\nAction 2 - read_email: success={result2.success}")
         if result2.result:
             print(f"  Subject: {result2.result['subject']}")
             print(f"  Body: {result2.result['body'][:50]}...")
 
     # Check if done
-    print(f"\nEpisode done: {env_adapter.is_done()}")
-    print(f"Final result: {env_adapter.get_final_result()}")
+    print(f"\nEpisode done: {env_adapter.done()}")
+    print(f"Episode result: {env_adapter.result()}")
     print()
 
 
@@ -235,7 +231,7 @@ scenarios:
     print("YAML Configuration Format:")
     print(yaml_example)
     print("\nTo load from YAML:")
-    print("  registry.load_from_yaml('scenarios.yaml', base_module='my_package')")
+    print("  registry.load_yaml('scenarios.yaml', base_module='my_package')")
     print()
 
 
