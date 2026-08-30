@@ -47,8 +47,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "build>=1.2",
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
     "black>=23.0",
     "ruff>=0.1",
 ]
@@ -59,8 +57,12 @@ Issues = "https://github.com/yeasen-z/agent-sim/issues"
 Changelog = "https://github.com/yeasen-z/agent-sim/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-include = ["agentsim*"]
+where = ["src", "."]
+include = ["agentsim*", "benchmarks*"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"benchmarks" = "benchmarks"
 
 [tool.setuptools.dynamic]
 version = {attr = "agentsim.__version__"}
@@ -68,26 +70,25 @@ version = {attr = "agentsim.__version__"}
 [tool.setuptools.package-data]
 agentsim = [
     "py.typed",
-    "benchmark/agentdojo/*.md",
-    "benchmark/agentdojo/*.yaml",
-    "benchmark/agentdojo/docs/*.md",
-    "benchmark/agentdojo/_vendor/data/suites/*/*.yaml",
-    "benchmark/agentdojo/_vendor/data/suites/*/include/*.yaml",
+]
+
+benchmarks = [
+    "agentdojo/*.md",
+    "agentdojo/*.yaml",
+    "agentdojo/docs/*.md",
+    "agentdojo/_vendor/data/suites/*/*.yaml",
+    "agentdojo/_vendor/data/suites/*/include/*.yaml",
 ]
 
 [tool.black]
 line-length = 100
 target-version = ['py310', 'py311', 'py312']
-extend-exclude = "src/agentsim/benchmark/agentdojo/_vendor"
+extend-exclude = "benchmarks/agentdojo/_vendor"
 
 [tool.ruff]
 line-length = 100
-exclude = ["src/agentsim/benchmark/agentdojo/_vendor"]
+exclude = ["benchmarks/agentdojo/_vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C4"]
 ignore = ["E501"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-asyncio_mode = "auto"

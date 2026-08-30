@@ -21,12 +21,12 @@ Run the project checks from the repository root:
 ```bash
 ruff check .
 black --check .
-pytest
 python -m build
 ```
 
-Keep changes focused, add tests for behavior changes, and update the README or
-changelog when a public API or user-facing behavior changes.
+Keep changes focused and update the README or changelog when a public API or
+user-facing behavior changes. Validation fixtures are maintained outside this
+runtime package and are not included in the repository checkout.
 
 ## Pull requests
 
