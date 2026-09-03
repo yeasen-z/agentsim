@@ -18,12 +18,11 @@ benchmarks/
 └── agentdojo/                 concrete benchmark pack and fixtures
     ├── suite modules and task loader
     ├── adapter.py
-    ├── _vendor/               private task/tool/data snapshot
+    ├── tools.py               AgentSim-native deterministic tools
+    ├── evaluation.py          native benchmark predicates
+    ├── data/                  normalized inert benchmark records
     └── docs/
 
-tutorial/
-├── scenarios/                 toy environment implementations
-└── *.py                       usage examples
 ```
 
 
@@ -61,8 +60,7 @@ agent loop.
 
 ## Dependency rule
 
-`agentsim` framework modules must never import from
-`benchmarks` or `tutorial`.
+`agentsim` framework modules must never import from `benchmarks`.
 
 Built-in benchmark modules may import the framework:
 
@@ -103,11 +101,12 @@ evaluator semantics remain benchmark-owned.
 AgentDojo is benchmark content, not a second execution framework inside
 AgentSim. Its four suites are adapted as `EnvSim` instances; their fixture
 loading is implemented by the standard `EnvSim.build_state()` hook; user tasks
-are adapted as `TaskDefine` instances; and original tool functions mutate the
-suite-specific `EnvState` through AgentSim's `ToolExecutor` boundary.
+are adapted as `TaskDefine` instances; and native AgentSim tool handlers mutate
+the suite-specific `EnvState` through the `ToolExecutor` boundary.
 
-The private `_vendor` package preserves the versioned AgentDojo definitions and
-fixtures needed to reproduce suite `v1.2.2`. Public callers should use only:
+Normalized JSON records preserve the versioned AgentDojo definitions and
+fixtures needed to reproduce suite `v1.2.2`. All executable behavior is owned
+by the native AgentSim adapter. Public callers should use only:
 
 ```python
 import benchmarks.agentdojo as agentdojo
@@ -136,8 +135,7 @@ benchmark campaign.
 
 `ScenarioDefine` is a small framework configuration record. Concrete benchmark
 scenarios do not belong in `src/agentsim`; they live under
-`benchmarks/<name>`. Teaching scenarios live under
-`tutorial/scenarios`.
+`benchmarks/<name>`.
 
 ## Public interfaces
 

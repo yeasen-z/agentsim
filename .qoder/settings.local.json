@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/hurryzhang/workplace/research/AgentSim/agentsim/src -type f -name \"*.py\" | head -60)",
+      "Bash(find /Users/hurryzhang/workplace/research/AgentSim/agentsim/benchmarks -type f -name \"*.py\" | head -40)",
+      "Bash(python:*)",
+      "Bash(PYTHONPATH=src python -c \"import agentsim; print\\('OK'\\); print\\([x for x in dir\\(agentsim\\) if 'Agent' in x]\\)\")"
+    ]
+  }
+}

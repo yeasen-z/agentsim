@@ -29,6 +29,6 @@ def iter_tasks(
             if attack is None:
                 continue
             for attacked in build_tasks(env, task, attack=attack, model_name=model_name):
-                injection_id = attacked.injection.ID if attacked.injection is not None else None
+                injection_id = attacked.injection.id if attacked.injection is not None else None
                 if injection_filter is None or injection_id in injection_filter:
                     yield suite_name, attacked

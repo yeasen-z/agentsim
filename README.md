@@ -89,8 +89,8 @@ observation.
 
 ### Run and evaluate one AgentDojo case
 
-Agent Sim owns execution and tracing; AgentDojo owns the task and security
-evaluators. The low-level environment API is also available for manual
+Agent Sim owns execution, tracing, and benchmark evaluation; AgentDojo supplies
+the versioned task content and security semantics. The low-level environment API is also available for manual
 debugging before using the shared scaffold runtime:
 
 ```python
@@ -266,7 +266,7 @@ env.trace().metadata["evaluation"] = evaluation.to_dict()
 - `agentsim.runtime`: `EpisodeRuntime`, the generic loop that connects one
   scaffold to one environment for one task.
 - `agentsim.llm_sim`: optional instruction, content, feedback, and user
-  simulators used by agents or tutorial.
+  simulators used by agents.
 - `benchmarks.common`: generic benchmark contracts, evaluation results,
   registry, and task traversal. It is repository-level infrastructure, not part
   of the installable AgentSim package.
@@ -288,7 +288,6 @@ agentsim/
 │   └── runtime.py
 ├── benchmarks/         # concrete benchmark packs and fixtures
 │   └── common/          # shared benchmark contracts and runner
-├── tutorial/            # Toy environments and integration examples
 ├── pyproject.toml       # Package and tool configuration
 └── README.md
 ```
@@ -322,8 +321,8 @@ python -m build
 ## Project scope
 
 `src/agentsim` is the reusable simulation framework. Concrete benchmark
-datasets and evaluators live under `benchmarks/`; toy environments
-live under `tutorial/`. Core modules never import benchmark modules.
+datasets and evaluators live under `benchmarks/`. Core modules never import
+benchmark modules.
 
 See [`docs/architecture.md`](docs/architecture.md) for the ownership and
 dependency rules, including the distinction between generic tracing and

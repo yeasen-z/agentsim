@@ -6,7 +6,6 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
-from ..agent.base import ReviewerAgent
 from ..agent.state import AgentMessage, AgentRole
 from ..interfaces import Action, ActionType, AgentAPI
 from .state import ScaffoldState
@@ -260,11 +259,8 @@ class MultiAgentScaffold(BaseScaffold):
             agent
             for agent in self.agents.values()
             if (
-                isinstance(agent, ReviewerAgent)
-                or (
-                    getattr(agent, "role", None) is AgentRole.REVIEWER
-                    and callable(getattr(agent, "review", None))
-                )
+                getattr(agent, "role", None) is AgentRole.REVIEWER
+                and callable(getattr(agent, "review", None))
             )
             and agent.agent_id != action.actor_id
         ]

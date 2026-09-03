@@ -42,17 +42,21 @@ agentdojo/
 ├── benchmark.yaml
 ├── attacks.py                # AgentDojo attack registry and payloads
 ├── adapter.py                # common BenchmarkAdapter implementation
-├── run.py                    # AgentDojo environment and evaluator adapter
+├── run.py                    # native environment and evaluator adapter
+├── tools.py                  # AgentSim-native deterministic tools
+├── evaluation.py             # native benchmark predicates
+├── data.py                   # immutable normalized-data records
 ├── runner.py                 # selection helpers over the shared runner
-├── _vendor/                  # AgentDojo 0.1.35 / suite v1.2.2 snapshot
+├── data/*/suite.json         # normalized v1.2.2 benchmark data
 ├── docs/
 ├── AGENTDOJO_LICENSE.md
 └── THIRD_PARTY_NOTICES.md
 ```
 
-The checked-in private snapshot contains the complete AgentDojo v1.2.2 suite
-definitions and fixtures. It is an implementation detail and does not create a
-runtime dependency on the external `agentdojo` package.
+The checked-in JSON contains the complete AgentDojo v1.2.2 environments, tool
+schemas, user tasks, injection tasks, injection bindings, and declarative
+ground-truth records. AgentSim owns every executable environment, tool, and
+evaluation path; the external `agentdojo` package is not a runtime dependency.
 
 Users enter through one benchmark-level dispatcher instead of importing
 same-named factories from individual suite directories:

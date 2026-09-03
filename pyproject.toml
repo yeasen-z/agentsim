@@ -75,19 +75,20 @@ agentsim = [
 benchmarks = [
     "agentdojo/*.md",
     "agentdojo/*.yaml",
+    "agentdojo/data/*/*.json",
     "agentdojo/docs/*.md",
-    "agentdojo/_vendor/data/suites/*/*.yaml",
-    "agentdojo/_vendor/data/suites/*/include/*.yaml",
+    "agentdyn/*.md",
+    "agentdyn/data/*/*.yaml",
+    "agentdyn/data/*/include/*.yaml",
+    "agentdyn/data/*/suite.json",
 ]
 
 [tool.black]
 line-length = 100
 target-version = ['py310', 'py311', 'py312']
-extend-exclude = "benchmarks/agentdojo/_vendor"
 
 [tool.ruff]
 line-length = 100
-exclude = ["benchmarks/agentdojo/_vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "C4"]

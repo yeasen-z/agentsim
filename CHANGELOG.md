@@ -23,11 +23,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Env`, `AgentAPI`, `ScaffoldAPI`, `RuntimeAPI`, `EnvInfo`, and `EnvAdapter` API.
 - Separated benchmark evaluation from `EnvSim`; the sim now
   owns execution and generic tracing only.
-- Moved concrete toy scenarios from the installable framework package to
-  `tutorial/scenarios`.
+- Removed the legacy repository tutorial and its toy scenario modules.
 - Added the complete AgentDojo v1.2.2 benchmark under
-  `benchmarks.agentdojo`: four environments, 97 user tasks, 35
-  injection tasks, original tools/evaluators, and all versioned fixtures.
+  `benchmarks.agentdojo`: four native AgentSim environments, 97 user tasks, 35
+  injection tasks, native tools/evaluators, and normalized versioned data.
 - Added AgentDojo's 17 registered attack methods and explicit per-run attack
   selection. Targeted attacks traverse all 949 user-task/injection-task pairs;
   DoS attacks use one injection target per user task, matching AgentDojo.
