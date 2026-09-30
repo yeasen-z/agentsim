@@ -3,7 +3,6 @@
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
-from ..interfaces import Env
 from ..task import ScenarioDefine, TaskDefine
 from ..trace.models import Trace
 from .state import EnvState

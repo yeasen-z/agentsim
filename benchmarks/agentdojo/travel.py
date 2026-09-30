@@ -1,4 +1,5 @@
 """AgentDojo travel suite environment."""
+
 from .data import load_suite
 from .run import DojoEnv
 

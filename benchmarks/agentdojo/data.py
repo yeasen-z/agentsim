@@ -111,7 +111,6 @@ def load_suite(name: str) -> SuiteSpec:
         tools=tuple(raw["tools"]),
         user_tasks={task["id"]: UserTaskSpec.from_dict(task) for task in raw["user_tasks"]},
         injection_tasks={
-            task["id"]: InjectionTaskSpec.from_dict(task)
-            for task in raw["injection_tasks"]
+            task["id"]: InjectionTaskSpec.from_dict(task) for task in raw["injection_tasks"]
         },
     )

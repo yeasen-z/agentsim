@@ -29,13 +29,19 @@ evaluators inspect ground truth and traces after execution.
 
 ## Installation
 
-Install the package from a local checkout:
+Agent Sim is designed to be modified during research. Clone it anywhere and
+install the checkout into the Python environment used by your experiment:
 
 ```bash
 git clone https://github.com/yeasen-z/agent-sim.git
 cd agent-sim
-python -m pip install .
+python -m pip install -e '.[dev]'
 ```
+
+The editable installation points Python at this checkout, so ordinary source
+changes are visible on the next process start without reinstalling. The Agent
+Sim checkout and the consuming experiment do not need to share a parent
+directory.
 
 ## Use as a dependency
 
@@ -196,6 +202,28 @@ the JSONL file.
 
 Do not modify `sys.path` to import the package. An editable install makes local
 framework changes immediately available to the application.
+
+### Optional OpenAI client
+
+Install the OpenAI SDK integration only when it is needed:
+
+```bash
+python -m pip install -e '.[openai]'
+```
+
+```python
+from agentsim import APIStyle, LLMAdapter, OpenAIClient
+
+client = OpenAIClient(
+    model="your-model-name",
+    api_style=APIStyle.RESPONSES,
+)
+agent = LLMAdapter(client)
+```
+
+The SDK reads its credentials from the normal OpenAI environment configuration.
+Mock clients cover local tests; a live API key is not required for the default
+test suite.
 
 ## Core model
 

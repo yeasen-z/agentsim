@@ -48,7 +48,12 @@ dependencies = [
 dev = [
     "build>=1.2",
     "black>=23.0",
+    "openai>=1.66",
+    "pytest>=8.0",
     "ruff>=0.1",
+]
+openai = [
+    "openai>=1.66",
 ]
 [project.urls]
 Homepage = "https://github.com/yeasen-z/agent-sim"
@@ -78,9 +83,12 @@ benchmarks = [
     "agentdojo/data/*/*.json",
     "agentdojo/docs/*.md",
     "agentdyn/*.md",
+    "agentdyn/LICENSES/*.txt",
     "agentdyn/data/*/*.yaml",
     "agentdyn/data/*/include/*.yaml",
     "agentdyn/data/*/suite.json",
+    "injecagent/data/*.json",
+    "injecagent/LICENSES/*.txt",
 ]
 
 [tool.black]

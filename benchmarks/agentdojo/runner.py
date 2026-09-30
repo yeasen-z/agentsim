@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
 from agentsim import EpisodeRuntime, ScaffoldAPI
-from benchmarks.common.runner import BenchmarkRun
-from benchmarks.common.runner import run_task as run_benchmark_task
+from benchmarks.common.runner import BenchmarkRun, run_case
 from benchmarks.common.runner import traverse as traverse_benchmark
 
 from .adapter import benchmark
@@ -41,8 +40,11 @@ def run_task(
     *,
     max_scaffold_turns: int = 100,
 ) -> BenchmarkRun:
-    return run_benchmark_task(
-        benchmark, benchmark.create_env(suite_name), task, scaffold,
+    case = benchmark.case_for_task(suite_name, task)
+    return run_case(
+        benchmark,
+        case,
+        scaffold,
         runtime=EpisodeRuntime(max_scaffold_turns=max_scaffold_turns),
     )
 
@@ -55,9 +57,10 @@ def traverse(
     max_tasks: Optional[int] = None,
     max_scaffold_turns: int = 100,
 ):
+    cases = (benchmark.case_for_task(suite_name, task) for suite_name, task in tasks)
     return traverse_benchmark(
         benchmark,
-        ((benchmark.create_env(suite_name), task) for suite_name, task in tasks),
+        cases,
         scaffold_factory,
         output_path=output_path,
         max_tasks=max_tasks,

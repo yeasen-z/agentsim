@@ -1,6 +1,13 @@
 """Agents and their private state."""
 
-from .adapters import HarnessAgent, LLMAdapter, LLMClient, MockLLMClient
+from .adapters import (
+    APIStyle,
+    HarnessAgent,
+    LLMAdapter,
+    LLMClient,
+    MockLLMClient,
+    OpenAIClient,
+)
 from .base import (
     BaseAgent,
     SingleAgent,
@@ -12,11 +19,13 @@ __all__ = [
     "AgentMessage",
     "AgentRole",
     "AgentState",
+    "APIStyle",
     "BaseAgent",
     "HarnessAgent",
     "LLMAdapter",
     "LLMClient",
     "MockLLMClient",
+    "OpenAIClient",
     "SingleAgent",
     "create_agent",
 ]

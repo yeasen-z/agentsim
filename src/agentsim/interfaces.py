@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
 
-from .task import TaskDefine
 from .env.tool import ToolDefine, ToolResult, ToolRiskLevel
+from .task import TaskDefine
 
 
 class ActionType(str, Enum):

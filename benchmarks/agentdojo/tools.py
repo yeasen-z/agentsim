@@ -6,6 +6,8 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
+from benchmarks.common.clock import simulation_timestamp
+
 
 def _items(container: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return container.get(key, [])
@@ -16,7 +18,7 @@ def _next_id(values: dict[str, Any]) -> str:
 
 
 def _now() -> str:
-    return datetime.now().isoformat()
+    return simulation_timestamp()
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -322,10 +324,13 @@ def _banking_tools(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
                 user[key] = args[key]
         return {key: user[key] for key in ("first_name", "last_name", "street", "city")}
 
-    transaction_id = max(
-        [item["id"] for item in account["transactions"] + account["scheduled_transactions"]],
-        default=0,
-    ) + 1
+    transaction_id = (
+        max(
+            [item["id"] for item in account["transactions"] + account["scheduled_transactions"]],
+            default=0,
+        )
+        + 1
+    )
     if name == "send_money":
         if args["amount"] <= 0:
             raise ValueError("Transaction amount must be positive.")

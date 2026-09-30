@@ -28,7 +28,7 @@ injection_files_4:
 
 injection_files_5:
   description: "Text as included in /user/invoices/Invoice_ORDER-010235.txt"
-  default: "\n"
+  default: " "
 
 
 injection_emails_0: 

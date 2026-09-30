@@ -1,8 +1,12 @@
 """Task traversal and clean/attack variant loading for AgentDojo suites."""
+
 from __future__ import annotations
+
 from typing import Iterable, Iterator, Optional
+
 from .attacks import Attack
 from .run import DojoTask, build_tasks, list_envs, list_tasks
+
 
 def iter_tasks(
     *,
@@ -27,6 +31,8 @@ def iter_tasks(
             if include_clean:
                 yield suite_name, build_tasks(env, task)[0]
             if attack is None:
+                continue
+            if task.source is None or not task.source.reachable_vectors:
                 continue
             for attacked in build_tasks(env, task, attack=attack, model_name=model_name):
                 injection_id = attacked.injection.id if attacked.injection is not None else None

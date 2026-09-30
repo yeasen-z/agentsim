@@ -27,6 +27,8 @@ jobs:
         run: ruff check .
       - name: Check Black formatting
         run: black --check .
+      - name: Run tests
+        run: pytest -q
 
   package:
     runs-on: ubuntu-latest

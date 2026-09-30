@@ -216,7 +216,9 @@ def list_tasks(env: EnvSim) -> list[TaskDefine]:
             max_steps=30,
             source=source,
         )
-        for source in sorted(env.suite.user_tasks.values(), key=lambda task: _task_sort_key(task.id))
+        for source in sorted(
+            env.suite.user_tasks.values(), key=lambda task: _task_sort_key(task.id)
+        )
     ]
 
 
@@ -403,9 +405,7 @@ def evaluate(env: EnvSim, task: TaskDefine, model_output: str = "") -> Evaluatio
     if task.injection is not None:
         method = resolve_attack(task.attack_method)
         attack_success = (
-            not utility_success
-            if method.is_dos
-            else _attack_success(env, task, model_output)
+            not utility_success if method.is_dos else _attack_success(env, task, model_output)
         )
     secure = attack_success is not True
     result = EvaluationResult(

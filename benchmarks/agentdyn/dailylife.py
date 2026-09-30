@@ -1,4 +1,5 @@
 """AgentDyn Daily Life suite."""
+
 from .env import AgentDynEnv
 
 

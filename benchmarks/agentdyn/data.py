@@ -157,7 +157,27 @@ def _load_yaml_environment(name: str) -> dict[str, Any]:
     loader = _yaml_loader(root)
     with root.joinpath("environment.yaml").open(encoding="utf-8") as stream:
         value = yaml.load(stream, Loader=loader)
-    return _jsonable(value)
+    # AgentDojo's TaskSuite does not validate the included YAML directly. It
+    # dumps the fully-resolved YAML (quoting strings), applies
+    # ``str.format(**injection_defaults)``, and only then parses/validates it.
+    # In particular, this is what turns escaped ``{{...}}`` fixture strings
+    # into literal JSON and installs default injection payloads.
+    defaults = {
+        vector: str(spec.get("default", "")) for vector, spec in _load_yaml_vectors(name).items()
+    }
+
+    class QuotedStringDumper(yaml.SafeDumper):
+        pass
+
+    QuotedStringDumper.add_representer(
+        str,
+        lambda dumper, item: dumper.represent_scalar("tag:yaml.org,2002:str", item, style='"'),
+    )
+    # PyYAML's upstream call leaves ``sort_keys`` at its True default. That
+    # ordering is observable in stringified directory listings and repo trees.
+    environment_text = yaml.dump(value, Dumper=QuotedStringDumper, sort_keys=True)
+    environment = yaml.safe_load(environment_text.format(**defaults))
+    return _jsonable(environment)
 
 
 def _load_yaml_vectors(name: str) -> dict[str, dict[str, Any]]:

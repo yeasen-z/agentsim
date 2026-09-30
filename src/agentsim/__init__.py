@@ -7,14 +7,26 @@ from .agent import (
     AgentMessage,
     AgentRole,
     AgentState,
+    APIStyle,
     BaseAgent,
     HarnessAgent,
     LLMAdapter,
     LLMClient,
     MockLLMClient,
+    OpenAIClient,
     SingleAgent,
     create_agent,
 )
+from .env import (
+    EntityState,
+    EnvState,
+    ToolCall,
+    ToolDefine,
+    ToolExecutor,
+    ToolResult,
+    ToolRiskLevel,
+)
+from .env.base import EnvSim
 from .interfaces import (
     Action,
     ActionType,
@@ -30,12 +42,8 @@ from .interfaces import (
     create_action,
     define_tool,
 )
-from .env import EntityState, EnvState, ToolCall, ToolDefine, ToolExecutor, ToolResult, ToolRiskLevel
-from .env.base import EnvSim
-from .registry import Plugin, Registry, get_registry, register, registry
-from .task import ScenarioDefine, SuccessCheck, TaskDefine
-from .trace import Trace, TraceEvent
 from .llm_sim import ContentGenerator, FeedbackGenerator, InstructionGenerator, UserSimulator
+from .registry import Plugin, Registry, get_registry, register, registry
 from .runtime import EpisodeRuntime
 from .scaffold import (
     BaseScaffold,
@@ -45,6 +53,8 @@ from .scaffold import (
     SingleAgentScaffold,
     create_scaffold,
 )
+from .task import ScenarioDefine, SuccessCheck, TaskDefine
+from .trace import Trace, TraceEvent
 
 __all__ = [
     "__version__",
@@ -54,6 +64,7 @@ __all__ = [
     "AgentMessage",
     "AgentRole",
     "AgentState",
+    "APIStyle",
     "BaseAgent",
     "BaseScaffold",
     "ContentGenerator",
@@ -71,6 +82,7 @@ __all__ = [
     "LLMAdapter",
     "LLMClient",
     "MockLLMClient",
+    "OpenAIClient",
     "MultiAgentScaffold",
     "Plugin",
     "PromptBuilder",

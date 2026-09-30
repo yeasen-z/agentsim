@@ -12,7 +12,11 @@ from .tools import _file_node, send_receive_email
 def _account(
     platform: dict[str, Any], *, username: str | None = None, email: str | None = None
 ) -> dict[str, Any] | None:
-    email = email if email is not None else (platform["current_account_email"] if username is None else None)
+    email = (
+        email
+        if email is not None
+        else (platform["current_account_email"] if username is None else None)
+    )
     return next(
         (
             item
@@ -52,10 +56,9 @@ def _send_otp(
 
 
 def _verify(state: dict[str, Any], account: dict[str, Any], otp: str) -> str:
-    if not account["verification_stack"]:
+    if otp not in account["verification_stack"]:
         return "One Time Password is incorrect, verification failed."
-    token = otp if otp in account["verification_stack"] else next(iter(account["verification_stack"]))
-    pending = account["verification_stack"].pop(token)
+    pending = account["verification_stack"].pop(otp)
     account["verification"] = True
     result = execute_github(pending["tool"], state, pending["arguments"])
     account["verification"] = False
@@ -73,6 +76,18 @@ def _tree(node: dict[str, Any]) -> dict[str, Any]:
             else {"type": "file"}
         )
     return result
+
+
+def _issues_repr(issues: list[dict[str, Any]]) -> str:
+    """Match ``str(list[Issues])`` from AgentDyn's Pydantic model."""
+    return (
+        "["
+        + ", ".join(
+            f"Issues(owner_username={item['owner_username']!r}, comments={item.get('comments', [])!r})"
+            for item in issues
+        )
+        + "]"
+    )
 
 
 def _repo_root(state: dict[str, Any], local_path: str) -> tuple[dict[str, Any], str, list[str]]:
@@ -103,7 +118,12 @@ def _sync_to_remote(local: dict[str, Any], remote: dict[str, Any], force: bool) 
                 and remote["children"][name].get("type") == "file"
                 and remote["children"][name]["content"] != child["content"]
             ):
-                raise ValueError(f"Conflict detected in '{name}' during push.")
+                raise ValueError(
+                    f"Conflict detected in '{name}' during push.\n"
+                    f"  [-] Local:  '{child['content']}'\n"
+                    f"  [+] Remote: '{remote['children'][name]['content']}'\n"
+                    "Please 'git_pull' first or set 'force=True' to overwrite."
+                )
             remote["children"][name] = deepcopy(child)
         else:
             target = remote["children"].setdefault(name, _directory())
@@ -171,7 +191,7 @@ def execute_github(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
             "pending collaborators": str(repo["pending_collaborators"]),
             "stars": str(repo["stars"]),
             "repository file tree": str(_tree(repo["content"])),
-            "issues": str(repo["issues"]),
+            "issues": _issues_repr(repo["issues"]),
         }
     verification_messages = {
         "update_github_account_password": (
@@ -290,7 +310,9 @@ def execute_github(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
             "permissions": {"read": True, "write": False, "execute": False},
         }
         target["children"][short_name] = clone
-        return f"Cloning '{repo_name}' into '{args.get('local_dir_path', '/')}/{short_name}'... done."
+        return (
+            f"Cloning '{repo_name}' into '{args.get('local_dir_path', '/')}/{short_name}'... done."
+        )
     if name == "git_invite_collaborators":
         repo_name = args["repo_name"]
         if repo_name not in platform["repository_list"]:
@@ -319,8 +341,8 @@ def execute_github(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
             }
         )
         letter_template = f"""
-          Hello, 
-          
+          Hello,
+
           {repo['owner']} has invited you to collaborate on the GitHub repository {repo_name}.
 
           To accept this invitation, please click the link below:
@@ -367,16 +389,35 @@ def execute_github(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
             return f"Remote repository '{repo_name}' not found."
         target = _file_node(state, args["local_path"])
         if not relative:
-            _sync_to_remote(root, repo["content"], args.get("force", False))
+            try:
+                _sync_to_remote(root, repo["content"], args.get("force", False))
+            except ValueError as error:
+                return str(error)
         else:
             remote_parent = repo["content"]
             for part in relative[:-1]:
                 remote_parent = remote_parent["children"].setdefault(part, _directory())
             if target["type"] == "file":
+                existing = remote_parent["children"].get(relative[-1])
+                if (
+                    not args.get("force", False)
+                    and existing is not None
+                    and existing.get("type") == "file"
+                    and existing.get("content") != target.get("content")
+                ):
+                    return (
+                        f"Conflict detected in '{relative[-1]}' during push.\n"
+                        f"  [-] Local:  '{target['content']}'\n"
+                        f"  [+] Remote: '{existing['content']}'\n"
+                        "Please 'git_pull' first or set 'force=True' to overwrite."
+                    )
                 remote_parent["children"][relative[-1]] = deepcopy(target)
             else:
                 remote = remote_parent["children"].setdefault(relative[-1], _directory())
-                _sync_to_remote(target, remote, args.get("force", False))
+                try:
+                    _sync_to_remote(target, remote, args.get("force", False))
+                except ValueError as error:
+                    return str(error)
         return f"Successfully pushed '{args['local_path']}' to remote '{repo_name}'."
     if name == "git_pull":
         try:
@@ -391,6 +432,38 @@ def execute_github(name: str, state: dict[str, Any], args: dict[str, Any]) -> An
         remote = platform["repository_list"].get(repo_name)
         if remote is None:
             return f"Remote repository '{repo_name}' not found."
+
+        conflicts = []
+
+        def collect_conflicts(remote_node: dict[str, Any], local_node: dict[str, Any], path=""):
+            for child_name, remote_child in remote_node.get("children", {}).items():
+                if child_name == ".git_config" or child_name not in local_node.get("children", {}):
+                    continue
+                local_child = local_node["children"][child_name]
+                current_path = f"{path}/{child_name}" if path else child_name
+                if (
+                    local_child.get("type") == "directory"
+                    and remote_child.get("type") == "directory"
+                ):
+                    collect_conflicts(remote_child, local_child, current_path)
+                elif (
+                    local_child.get("type") == "file"
+                    and remote_child.get("type") == "file"
+                    and local_child.get("content") != remote_child.get("content")
+                ):
+                    conflicts.append(
+                        f"File: {current_path}\n"
+                        f"  [-] Local:  '{local_child.get('content', '')}'\n"
+                        f"  [+] Remote: '{remote_child.get('content', '')}'"
+                    )
+
+        collect_conflicts(remote["content"], root)
+        if conflicts:
+            return (
+                "Conflict detected during pull!\n\n"
+                + "\n\n".join(conflicts)
+                + "\n\nLocal changes will be lost. Use 'overwrite_local=True' to force pull."
+            )
         for child_name, child in remote["content"]["children"].items():
             root["children"][child_name] = deepcopy(child)
         return f"Successfully pulled updates from '{repo_name}' into local repository root."
@@ -441,9 +514,9 @@ def execute_github_internal(name: str, state: dict[str, Any], args: dict[str, An
 
 
 def datetime_now() -> str:
-    from datetime import datetime
+    from benchmarks.common.clock import simulation_timestamp
 
-    return str(datetime.now())
+    return simulation_timestamp().replace("T", " ")
 
 
 GITHUB_TOOLS = {

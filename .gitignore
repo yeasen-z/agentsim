@@ -19,3 +19,9 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Local agent/editor configuration (keep personal settings out of the repo)
+.qoder/
+
+# Private working notes; ignore the directory rather than exposing filenames
+/.internal-notes/

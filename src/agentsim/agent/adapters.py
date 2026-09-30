@@ -4,32 +4,88 @@ Connects LLM models to the agent framework.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 from ..interfaces import Action, ActionType
 from .base import SingleAgent
 from .state import AgentRole
 
 
+class APIStyle(str, Enum):
+    """LLM API style selection."""
+
+    CHAT = "chat"
+    RESPONSES = "responses"
+
+
 class LLMClient:
-    """Abstract LLM client interface."""
+    """Abstract LLM client interface.
+
+    Supports two API styles:
+    - CHAT: OpenAI Chat Completions API (/v1/chat/completions)
+    - RESPONSES: OpenAI Responses API (/v1/responses) with conversation chaining
+    """
+
+    def __init__(self, api_style: Union[APIStyle, str] = APIStyle.CHAT):
+        self.api_style = APIStyle(api_style) if isinstance(api_style, str) else api_style
+        self._response_id: Optional[str] = None
 
     def generate(
-        self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]] = None, **kwargs
+        self,
+        messages: Optional[List[Dict[str, str]]] = None,
+        input: Optional[Union[str, List[Dict[str, Any]]]] = None,
+        instructions: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        previous_response_id: Optional[str] = None,
+        **kwargs,
     ) -> str:
-        """Generate a response from the LLM."""
+        """Generate a response from the LLM.
+
+        Args:
+            messages: Chat-style messages (for CHAT API style)
+            input: Responses API input - text or list of input items
+            instructions: Responses API system instructions
+            tools: Available tools for the model
+            previous_response_id: Chain to a previous response for context (Responses API only)
+            **kwargs: Additional parameters (temperature, model, etc.)
+
+        Returns:
+            Generated text response
+        """
         raise NotImplementedError
+
+    def reset_conversation(self) -> None:
+        """Reset the conversation chain (clears previous_response_id)."""
+        self._response_id = None
+
+    @property
+    def current_response_id(self) -> Optional[str]:
+        """Get the current response ID for conversation chaining."""
+        return self._response_id
 
 
 class MockLLMClient(LLMClient):
     """Mock LLM client for testing."""
 
-    def __init__(self, responses: List[str] = None):
+    def __init__(
+        self,
+        responses: List[str] = None,
+        api_style: Union[APIStyle, str] = APIStyle.CHAT,
+    ):
+        super().__init__(api_style=api_style)
         self.responses = responses or []
         self.call_count = 0
+        self._mock_response_id_counter = 0
 
     def generate(
-        self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]] = None, **kwargs
+        self,
+        messages: Optional[List[Dict[str, str]]] = None,
+        input: Optional[Union[str, List[Dict[str, Any]]]] = None,
+        instructions: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        previous_response_id: Optional[str] = None,
+        **kwargs,
     ) -> str:
         if self.call_count < len(self.responses):
             response = self.responses[self.call_count]
@@ -37,13 +93,93 @@ class MockLLMClient(LLMClient):
             response = '{"action_type": "return", "output": ""}'
 
         self.call_count += 1
+        self._mock_response_id_counter += 1
+        self._response_id = f"mock_resp_{self._mock_response_id_counter}"
         return response
+
+
+class OpenAIClient(LLMClient):
+    """OpenAI SDK-backed client for chat completions or Responses API calls.
+
+    The OpenAI dependency is optional. Pass an SDK-compatible client in tests,
+    or install ``agentsim[openai]`` for live requests.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        *,
+        api_style: Union[APIStyle, str] = APIStyle.RESPONSES,
+        client: Any = None,
+        api_key: Optional[str] = None,
+        client_options: Optional[Mapping[str, Any]] = None,
+        request_options: Optional[Mapping[str, Any]] = None,
+    ):
+        super().__init__(api_style=api_style)
+        if not model:
+            raise ValueError("model must not be empty")
+        if client is None:
+            try:
+                from openai import OpenAI
+            except ImportError as error:
+                raise ImportError(
+                    "OpenAIClient requires the optional dependency; "
+                    "install it with `pip install -e '.[openai]'`"
+                ) from error
+            options = dict(client_options or {})
+            if api_key is not None:
+                options["api_key"] = api_key
+            client = OpenAI(**options)
+        self.model = model
+        self.client = client
+        self.request_options = dict(request_options or {})
+
+    def generate(
+        self,
+        messages: Optional[List[Dict[str, str]]] = None,
+        input: Optional[Union[str, List[Dict[str, Any]]]] = None,
+        instructions: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        previous_response_id: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        request = {**self.request_options, **kwargs, "model": self.model}
+        if tools:
+            request["tools"] = tools
+
+        if self.api_style is APIStyle.RESPONSES:
+            if input is None:
+                raise ValueError("Responses API calls require input")
+            request["input"] = input
+            if instructions is not None:
+                request["instructions"] = instructions
+            if previous_response_id is not None:
+                request["previous_response_id"] = previous_response_id
+            response = self.client.responses.create(**request)
+            self._response_id = response.id
+            output_text = response.output_text
+            if not isinstance(output_text, str):
+                raise TypeError("Responses API output_text must be a string")
+            return output_text
+
+        if messages is None:
+            raise ValueError("Chat Completions API calls require messages")
+        request["messages"] = messages
+        response = self.client.chat.completions.create(**request)
+        content = response.choices[0].message.content
+        if not isinstance(content, str):
+            raise TypeError("Chat Completions response content must be a string")
+        return content
 
 
 class LLMAdapter(SingleAgent):
     """
     LLM-based agent adapter.
     Wraps an LLM client to provide tool-calling capabilities.
+
+    Supports two API styles via the LLMClient:
+    - CHAT: Traditional chat completions with message history
+    - RESPONSES: Responses API with previous_response_id for conversation chaining
     """
 
     def __init__(
@@ -95,7 +231,6 @@ Only respond with valid JSON, no other text."""
     def _parse_llm_response(self, response: str) -> Action:
         """Parse one structured action from an LLM response."""
         try:
-            # Try to extract JSON from response
             start = response.find("{")
             end = response.rfind("}") + 1
             if start >= 0 and end > start:
@@ -127,6 +262,78 @@ Only respond with valid JSON, no other text."""
             metadata={"raw_response": response},
         )
 
+    def _build_user_message(
+        self,
+        instruction: str,
+        observation: Dict[str, Any],
+        available_tools: List[Dict[str, Any]],
+    ) -> str:
+        """Build the user message content."""
+        tools_desc = self._format_tools_for_llm(available_tools)
+        obs_str = json.dumps(observation, indent=2, default=str)
+
+        return f"""Task: {instruction}
+
+Current Observation:
+{obs_str}
+
+{tools_desc}
+
+Choose your next action:"""
+
+    def _call_chat_api(
+        self,
+        instruction: str,
+        observation: Dict[str, Any],
+        available_tools: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Call using Chat Completions API style."""
+        user_message = self._build_user_message(instruction, observation, available_tools)
+
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+
+        if context and context.get("messages"):
+            for msg in context["messages"]:
+                if msg.get("sender_id") != self.agent_id:
+                    messages.append({"role": "user", "content": msg.get("content", "")})
+                else:
+                    messages.append({"role": "assistant", "content": msg.get("content", "")})
+
+        return self.llm_client.generate(messages=messages, temperature=self.temperature)
+
+    def _call_responses_api(
+        self,
+        instruction: str,
+        observation: Dict[str, Any],
+        available_tools: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Call using Responses API style with conversation chaining."""
+        user_message = self._build_user_message(instruction, observation, available_tools)
+
+        response_input: Union[str, List[Dict[str, Any]]] = user_message
+        if context and context.get("messages"):
+            response_input = []
+            for message in context["messages"]:
+                role = "assistant" if message.get("sender_id") == self.agent_id else "user"
+                response_input.append({"role": role, "content": message.get("content", "")})
+            response_input.append({"role": "user", "content": user_message})
+
+        previous_response_id = getattr(self.llm_client, "current_response_id", None)
+
+        response = self.llm_client.generate(
+            input=response_input,
+            instructions=self.system_prompt,
+            previous_response_id=previous_response_id,
+            temperature=self.temperature,
+        )
+
+        return response
+
     def act(
         self,
         instruction: str,
@@ -137,39 +344,23 @@ Only respond with valid JSON, no other text."""
         """Generate action using LLM."""
         self.state.status = "thinking"
 
-        # Build prompt
-        tools_desc = self._format_tools_for_llm(available_tools)
+        try:
+            if getattr(self.llm_client, "api_style", APIStyle.CHAT) == APIStyle.RESPONSES:
+                response = self._call_responses_api(
+                    instruction, observation, available_tools, context
+                )
+            else:
+                response = self._call_chat_api(instruction, observation, available_tools, context)
+            return self._parse_llm_response(response)
+        finally:
+            self.state.status = "idle"
 
-        obs_str = json.dumps(observation, indent=2, default=str)
-
-        user_message = f"""Task: {instruction}
-
-Current Observation:
-{obs_str}
-
-{tools_desc}
-
-Choose your next action:"""
-
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-
-        # Add context messages if available
-        if context and context.get("messages"):
-            for msg in context["messages"]:
-                if msg.get("sender_id") != self.agent_id:
-                    messages.append({"role": "user", "content": msg.get("content", "")})
-                else:
-                    messages.append({"role": "assistant", "content": msg.get("content", "")})
-
-        # Call LLM
-        response = self.llm_client.generate(messages=messages, temperature=self.temperature)
-
-        action = self._parse_llm_response(response)
-        self.state.status = "idle"
-        return action
+    def reset(self) -> None:
+        """Reset agent state and conversation chain."""
+        super().reset()
+        reset_conversation = getattr(self.llm_client, "reset_conversation", None)
+        if callable(reset_conversation):
+            reset_conversation()
 
 
 class HarnessAgent(SingleAgent):

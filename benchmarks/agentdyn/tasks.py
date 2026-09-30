@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, Optional
 
-from benchmarks.agentdojo.attacks import Attack
+from benchmarks.common.attacks import Attack
 
 from .env import AgentDynTask, build_tasks, list_envs, list_tasks
 
@@ -35,13 +35,12 @@ def iter_tasks(
                 yield suite_name, build_tasks(env, task)[0]
             if attack is None:
                 continue
+            if task.source is None or not task.source.reachable_vectors:
+                continue
             for attacked in build_tasks(env, task, attack=attack, model_name=model_name):
                 injection_id = attacked.injection.id if attacked.injection is not None else None
                 if injection_filter is None or injection_id in injection_filter:
                     yield suite_name, attacked
 
 
-TASKS = {
-    env.suite.name: list_tasks(env)
-    for env in list_envs()
-}
+TASKS = {env.suite.name: list_tasks(env) for env in list_envs()}

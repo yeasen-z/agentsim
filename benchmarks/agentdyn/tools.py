@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable
+
+from benchmarks.common.clock import simulation_timestamp
 
 
 def _next_id(values: dict[str, Any]) -> str:
@@ -13,7 +15,7 @@ def _next_id(values: dict[str, Any]) -> str:
 
 
 def _now() -> str:
-    return datetime.now().isoformat()
+    return simulation_timestamp()
 
 
 def _inbox(database: dict[str, Any], address: str | None = None) -> dict[str, Any]:
@@ -81,12 +83,14 @@ def _upload_file(state: dict[str, Any], path: str) -> str:
     if node.get("type") != "file":
         raise IsADirectoryError(path)
     node["source_name"] = path.rstrip("/").rsplit("/", 1)[-1]
-    file_id = str(len(state["web_database"]["file_list"]) + 1)
+    file_id = _next_id(state["web_database"]["file_list"])
     state["web_database"]["file_list"][file_id] = node
     return file_id
 
 
-def _parse_attachments(state: dict[str, Any], attachments: list[dict[str, Any]] | None) -> list[Any]:
+def _parse_attachments(
+    state: dict[str, Any], attachments: list[dict[str, Any]] | None
+) -> list[Any]:
     parsed: list[Any] = []
     for attachment in attachments or []:
         if not isinstance(attachment, dict):
@@ -116,8 +120,15 @@ def send_receive_email(
     attachments: list[dict[str, Any]] | None = None,
     cc: list[str] | None = None,
     bcc: list[str] | None = None,
+    reservation: str | None = None,
+    time: str | None = None,
+    size: str | None = None,
 ) -> dict[str, Any]:
     database = state["email_database"]
+    if reservation is not None:
+        if time is None or size is None:
+            raise ValueError("Reservation emails require both time and party size.")
+        body = body.replace("@@@time@@@", str(time)).replace("@@@size@@@", str(size))
     recipients = [recipients] if isinstance(recipients, str) else list(recipients)
     parsed_attachments = _parse_attachments(state, attachments)
     sender_inbox = _inbox(database, sender)
@@ -160,6 +171,8 @@ def _send_only_email(
     body: str,
     recipients: list[str],
     attachments: list[Any] | None = None,
+    cc: list[str] | None = None,
+    bcc: list[str] | None = None,
 ) -> dict[str, Any]:
     """Append a sent message without delivering a second copy to the sender."""
     inbox = _inbox(state["email_database"], sender)
@@ -168,8 +181,8 @@ def _send_only_email(
         "id_": email_id,
         "sender": sender,
         "recipients": list(recipients),
-        "cc": [],
-        "bcc": [],
+        "cc": list(cc or []),
+        "bcc": list(bcc or []),
         "subject": subject,
         "body": body,
         "status": "sent",
@@ -186,7 +199,7 @@ def _email_tool(name: str, state: dict[str, Any], args: dict[str, Any]) -> Any:
     database = state["email_database"]
     inbox = _inbox(database)
     if name == "send_email":
-        _send_only_email(
+        send_receive_email(
             state,
             database["current_account"],
             args["subject"],
@@ -236,7 +249,27 @@ def _filesystem_tool(name: str, state: dict[str, Any], args: dict[str, Any]) -> 
             return f"{args['path']} is not a directory."
         if not node.get("permissions", {}).get("read", True):
             raise PermissionError(f"Read permission denied for {args['path']}")
-        return list(node["children"])
+        # Upstream returns the metadata records as a string, not just names.
+        return str(
+            [
+                {
+                    "name": child_name,
+                    "type": child.get("type", "file"),
+                    # Upstream returns ``Permissions.dict()`` whose field
+                    # order is model-declaration order, not YAML's sorted
+                    # mapping order.
+                    "permissions": {
+                        key: child.get("permissions", {}).get(key, default)
+                        for key, default in (
+                            ("read", True),
+                            ("write", child.get("type") == "directory"),
+                            ("execute", False),
+                        )
+                    },
+                }
+                for child_name, child in node["children"].items()
+            ]
+        )
     if name == "read_file":
         node = _file_node(state, args["path"])
         if node.get("type") == "directory":
@@ -331,7 +364,12 @@ def _web_tool(
         if source is None:
             return "Source Not Found. Try to directly access the URL."
         return _download_id(state, str(source), args.get("save_dir", "/downloads"))
-    page = _web_page(state, args["url"])
+    try:
+        page = _web_page(state, args["url"])
+    except ValueError:
+        if name == "browse_webpage":
+            return "404 Not Found"
+        raise
     if name == "browse_webpage":
         if not page["field_to_parameters"] and page["web_function"]:
             function = page["web_function"][0]
@@ -341,7 +379,7 @@ def _web_tool(
         if "inputs" in args:
             values = args["inputs"]
         else:
-            values = dict(zip(args["input_ids"], args["input_values"]))
+            values = dict(zip(args["input_ids"], args["input_values"], strict=True))
         mapped = {page["field_to_parameters"][key]: value for key, value in values.items()}
         if not page["web_function"]:
             return page["web_content"]
@@ -453,7 +491,12 @@ def _bank_account(database: dict[str, Any], iban: str | None = None) -> dict[str
 
 
 def _transfer(
-    database: dict[str, Any], sender: dict[str, Any], recipient: str, amount: float, subject: str, date: str
+    database: dict[str, Any],
+    sender: dict[str, Any],
+    recipient: str,
+    amount: float,
+    subject: str,
+    date: str,
 ) -> str:
     if amount <= 0:
         return "The amount must be greater than 0."
@@ -480,7 +523,9 @@ def _transfer(
     sender["transactions"].append(transaction)
     recipient_account["balance"] += amount
     recipient_account["transactions"].append(deepcopy(transaction))
-    return f"Sent {amount} to {recipient}."
+    # Upstream's tool signature validates ``amount`` as float before
+    # interpolating the confirmation string (so 200 is rendered as 200.0).
+    return f"Sent {float(amount)} to {recipient}."
 
 
 def _daily_bank_tool(name: str, state: dict[str, Any], args: dict[str, Any]) -> Any:
@@ -515,12 +560,9 @@ def _daily_bank_tool(name: str, state: dict[str, Any], args: dict[str, Any]) -> 
             args["date"],
         )
     if name == "verify_transaction":
-        if not account["verification_stack"]:
+        if args["otp"] not in account["verification_stack"]:
             return "One Time Password is incorrect, verification failed."
-        token = args["otp"] if args["otp"] in account["verification_stack"] else next(
-            iter(account["verification_stack"])
-        )
-        pending = account["verification_stack"].pop(token)
+        pending = account["verification_stack"].pop(args["otp"])
         account["verification"] = True
         result = _daily_bank_tool(pending["tool"], state, pending["arguments"])
         account["verification"] = False
@@ -598,6 +640,9 @@ def execute_tool(suite: str, name: str, state: dict[str, Any], args: dict[str, A
                 parameters.get("attachments"),
                 parameters.get("cc"),
                 parameters.get("bcc"),
+                parameters.get("reservation"),
+                parameters.get("time"),
+                parameters.get("size"),
             )
         if handler == "send_receive_email_with_login":
             if (
@@ -631,10 +676,12 @@ def execute_tool(suite: str, name: str, state: dict[str, Any], args: dict[str, A
         return execute_shopping(name, state, args)
     if suite == "github" and name in GITHUB_TOOLS:
         return execute_github(name, state, args)
-    try:
+    shared_tools = EMAIL_TOOLS | FILESYSTEM_TOOLS | WEB_TOOLS | CALENDAR_TOOLS
+    if name in shared_tools or (
+        suite == "dailylife" and name in {"send_money", "get_balance", "verify_transaction"}
+    ):
         return execute_shared(suite, name, state, args, invoke_internal)
-    except KeyError as error:
-        raise ValueError(f"Unknown AgentDyn {suite} tool: {name}") from error
+    raise ValueError(f"Unknown AgentDyn {suite} tool: {name}")
 
 
 __all__ = [

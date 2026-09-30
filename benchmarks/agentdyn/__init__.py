@@ -1,10 +1,10 @@
 """AgentDyn benchmark adapted to AgentSim's four-layer architecture."""
 
+from benchmarks.common.attacks import Attack, list_attacks
 from benchmarks.common.registry import benchmark_registry
-from benchmarks.agentdojo.attacks import Attack, list_attacks
 
-from .adapter import AgentDynBenchmark, benchmark
 from . import dailylife, github, shopping
+from .adapter import AgentDynBenchmark, benchmark
 from .env import AgentDynEnv, AgentDynState, build_tasks, evaluate, list_envs, list_tasks
 from .runner import run_task, traverse
 from .tasks import TASKS, iter_tasks
